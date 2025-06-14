@@ -1,7 +1,9 @@
 import torch 
 from torch import nn
+from functions import layer_dimensions
 
 class Encoder(nn.module):
   def __init__(self, in_dim, latent_dim, num_layers):
     super().__init__()
-    self.linears = nn.ModuleList([nn.Linear(10, 10) for i in range(10)])
+    self.layer_dims = layer_dimensions(in_dim, latent_dim, num_layers)
+    self.linears = nn.ModuleList([nn.Linear(self.layer_dims[i]) for i in range(num_layers)])

@@ -25,8 +25,12 @@ class Decoder(nn.module):
     x = nn.sigmoid(x)
     return x
 class VAE(nn.module):
-  def __init__(self, in_dim, latent_dim, n_layers)
+  def __init__(self, in_dim, latent_dim, n_layers):
     self.mu = nn.linear(latent_dim, latent_dim)
     self.log_var = nn.linear(latent_dim, latent_dim)
     self.encoder = Encoder(in_dim, latent_dim, n_layers)
     self.decoder = Decoder(in_dim, latent_dim, n_layers)
+  def sampling(self, mu, log_var):
+    std = torch.exp(0.5 * log_var)
+    eps = torch.rand_like(std)
+    return mu + std * eps

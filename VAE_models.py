@@ -24,3 +24,9 @@ class Decoder(nn.module):
       x = self.relus[i](layer(x))
     x = nn.sigmoid(x)
     return x
+class VAE(nn.module):
+  def __init__(self, in_dim, latent_dim, n_layers)
+    self.mu = nn.linear(latent_dim, latent_dim)
+    self.log_var = nn.linear(latent_dim, latent_dim)
+    self.encoder = Encoder(in_dim, latent_dim, n_layers)
+    self.decoder = Decoder(in_dim, latent_dim, n_layers)

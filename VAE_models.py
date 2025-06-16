@@ -34,7 +34,7 @@ class VAE(nn.module):
     std = torch.exp(0.5 * log_var)
     eps = torch.rand_like(std)
     return mu + std * eps
-  def foward(self, x)
+  def foward(self, x):
     encoded = self.encoder(x)
     log_var = self.log_var(encoded)
     mu = self.mu(encoded)

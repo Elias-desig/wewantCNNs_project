@@ -192,3 +192,55 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# --------------------------
+# LaTeX intermediate files
+# --------------------------
+*.aux      # auxiliary info
+*.bbl      # bibliography data
+*.blg      # BibTeX log
+*.brf      # bibliography references
+*.idx      # index
+*.ind      # index
+*.ilg      # index log
+*.lof     # list of figures
+*.lot      # list of tables
+*.out      # general output
+*.toc      # table of contents
+*.nav      # table of contents (beamer)
+*.snm      # slide navigation (beamer)
+
+# --------------------------
+# Latexmk / build system
+# --------------------------
+*.fls      # latexmk file list
+*.fdb_latexmk  # latexmk database
+*.synctex.gz   # SyncTeX support
+.latexmkrc     # if local and auto-generated
+
+# --------------------------
+# Logs and temporary
+# --------------------------
+*.log
+*.gz
+*.run.xml
+*.bcf
+*.xdv
+
+# --------------------------
+# PDF and other outputs
+# --------------------------
+# If you compile to PDF and don’t want to check it in:
+*.pdf
+# Or, if you want to keep your final slide deck but ignore drafts:
+# build/
+# *.pdf
+
+# --------------------------
+# Editors and OS cruft
+# --------------------------
+*.bak
+*~
+*.swp
+.DS_Store
+.vscode/

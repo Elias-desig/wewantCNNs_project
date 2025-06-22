@@ -1,30 +1,56 @@
-# IF-BEAMER - Modelo de Apresentação Ifes - v1.0.1
+# CleanEasy Beamer Theme
 
-Template de Apresentação em LaTeX para o Instituto Federal de Educação, Ciência e Tecnologia do Espírito Santo.
-Template Editado para o PPGCA - UTFPR Curitiba.
+A clean and minimalist Beamer theme designed for professional and academic presentations.  
+This theme separates style components into modular `.sty` files for flexibility and clarity.
 
-## Observações:
+---
 
-### Alterar cores principais:
+## 🚀 How to Use
 
-No arquivo `if-beamer.cls`, altere os comandos das linhas 104 e 105 para a cor desejada:
+1. Place all files in your working directory (or install to a local LaTeX path).
+2. In your LaTeX document, load the theme with:
+
+```latex
+\documentclass{beamer}
+\usetheme{CleanEasy}
 ```
-\colorlet{mainColor1}{cadmiumgreen} % dark
-\colorlet{mainColor2}{honeydew} % light
+
+3. (Optional) Include modular configurations:
+
+```latex
+\input{configs/configs.tex}
+\input{configs/title_page.tex}
 ```
 
-### Overleaf Gallery:
+4. Compile with `pdflatex` or `latexmk`:
 
-[Overleaf (ifes-beamer - v1.0.0)](https://www.overleaf.com/latex/templates/presentation-template/fzswgwtncpcg)
+```bash
+pdflatex CleanEasy.tex
+```
 
-<s>Github (ifes-beamer - v1.0.0)</s>
+---
 
-## Autor
+## 💡 Features
 
-* **Humberto da Silva Neto**
-* **Haron Calegari Fanticelli**
-* **Adaptado por João Sucupira e Daniel Pigatto (UTFPR)**
+- ✅ Clean design suitable for scientific and professional presentations
+- 🎨 Separated color/font definitions for easy customization
+- 🔌 Modular components (title page, configuration settings)
+- 🖼️ Ready-to-use logos
 
-## Licença
+---
 
-Este projeto está licenciado sob a licença GPU-v3 - consulte o arquivo [LICENSE](https://github.com/hsneto/if-beamer/blob/master/LICENSE) para detalhes.
+## 📚 Demo
+
+The `sample.tex` file showcases how to use the theme. Modify title, sections, logos, and colors as needed.
+
+---
+
+## ✨ Credits
+
+Designed and maintained by Jose P. Marchezi
+
+---
+
+## 📝 License
+
+This project is released under the **Unlicense License**, granting you complete freedom to use, modify, and distribute the template. For more details, see the [LICENSE](LICENSE) file.

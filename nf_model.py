@@ -28,11 +28,11 @@ class NormaFlows(nn.Module):
         self.lin_flows()
         self.norm_prob()
         log_px = self.change_of_variable()
-        loss = -torch.mean(log_px)
+        loss = -nn.mean(log_px)
 
         # Optimieren
         loss.backward()  # Gradienten berechnen
-        with torch.no_grad():
+        with nn.no_grad():
             self.weights -= learning_rate * self.weights.grad
             self.bias -= learning_rate * self.bias.grad
 

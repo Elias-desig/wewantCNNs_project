@@ -45,9 +45,277 @@
 \end{frame}
 
 \section{Normalizing Flows}
-\begin{frame}{Normalizing flow stuff}
+
+
+\begin{frame}{Core Idea}
+  \begin{block}{Goal}
+    Building realistic data distributions from a simple distribution via a flow of invertible transformations
+  \end{block}
   
+  \vspace{0.3}
+  
+  \begin{center}
+    \includegraphics[width=0.7\textwidth]{pictures/nf_illustration}
+  \end{center}
+\end{frame} 
+
+\begin{frame}{Core Idea}
+  \begin{block}{Goal}
+    Building realistic data distributions from simple distributions via a flow of invertible transformations
+  \end{block}
+  
+  \vspace{0.3}
+  
+  \begin{center}
+    \includegraphics[width=0.7\textwidth]{pictures/nf_illustration}
+  \end{center}
+  
+  \begin{tikzpicture}[remember picture,overlay]
+    \node at (current page.center) {
+      \textcolor{red}{\scalebox{20}{?}}
+    };
+  \end{tikzpicture}
 \end{frame}
+
+\begin{frame}{How does this work}
+Given:
+\begin{itemize}
+  \item Data points \( x_1, x_2, \ldots, x_n \)
+  \item A base distribution \( p_Z(z) \), typically standard normal
+  \item A bijective transformation \( f \) such that \( x = f(Z) \)
+\end{itemize}
+
+For each data point \( x \), we:
+\begin{enumerate}
+  \item Compute \( z = f^{-1}(x) \)
+  \item Evaluate \( p_Z(z) \) using the base density
+  \item Apply the change of variables formula to determine \(p_x(x)\):  
+  \[
+  p_X(x) = p_Z(z) \cdot \left| \det \left( \frac{\partial f^{-1}}{\partial x} \right) \right|
+  \]
+\end{enumerate}
+\end{frame}
+
+
+\begin{frame}{What we learn}
+  \begin{center}
+    \centering
+    \only<1->{\includegraphics[width=0.8\textwidth]{pictures/change_of_variables/1.png}\\[0.5cm]}
+    \only<2->{\includegraphics[width=0.8\textwidth]{pictures/change_of_variables/2.png}\\[0.5cm]}
+    \only<3->{\includegraphics[width=0.8\textwidth]{pictures/change_of_variables/3.png}}
+  \end{center}
+\end{frame}
+
+
+\begin{frame}{What we learn}
+    \centering
+    \includegraphics<4>[width=0.8\textwidth]{pictures/tof.png}
+\end{frame}
+
+
+\begin{frame}{What we achieve}
+  \begin{block}{Goal}
+    In the end we can sample new data points by using the generative direction and estimate the probability of these datapoints by the use of the normalizing direction
+  \end{block}
+  
+  \begin{center}
+  \includegraphics[width=0.8\textwidth]{pictures/forandinv.png}
+  \end{center}
+\end{frame}
+
+
+\begin{frame}{In deep neuronal networks}
+\textbf{Forward Mapping}
+\begin{center}
+  \includegraphics[width=0.5\textwidth]{pictures/fandiindnn/1.png}\\[0.4cm]
+  \includegraphics[width=0.5\textwidth]{pictures/fandiindnn/2.png}
+\end{center}
+\vspace{0.4cm}
+
+\textbf{Inverse Mapping}
+\begin{center}
+  \includegraphics[width=0.5\textwidth]{pictures/fandiindnn/3.png}\\[0.4cm]
+  \includegraphics[width=0.5\textwidth]{pictures/fandiindnn/4.png}
+\end{center}
+\end{frame}
+
+% Current Postition 
+
+\begin{frame}{Linear Flows}
+\begin{block}{Definition}
+A linear flow has the form 
+\[
+f[h] = \beta + \Omega h,
+\]
+where \(\Omega \in \mathbb{R}^{D \times D}\) is invertible.
+\end{block}
+
+\begin{itemize}
+  \item Inversion cost: \(\mathcal{O}(D^3)\) (general matrix inverse)
+  \item Jacobian determinant: \(\det(\Omega)\), computable in \(\mathcal{O}(D^3)\)
+  \item Special matrix forms improve efficiency:
+    \begin{itemize}
+      \item Diagonal matrices: \(\mathcal{O}(D)\), but no interaction between elements
+      \item Orthogonal matrices: efficient inversion, fixed determinant, no scaling per dimension
+      \item Triangular matrices: inversion by back-substitution in \(\mathcal{O}(D^2)\), determinant is product of diagonal elements
+    \end{itemize}
+  \item Efficient parameterization via LU decomposition:
+  \[
+  \Omega = P L (U + D),
+  \]
+  with \(P\) permutation matrix, \(L\) lower triangular, \(U\) upper triangular (zero diagonal), \(D\) diagonal matrix.
+  \begin{itemize}
+    \item Inversion in \(\mathcal{O}(D^2)\)
+    \item Log determinant = sum of log absolute diagonal entries of \(L\) and \(D\)
+  \end{itemize}
+  \item Limitation: Linear flows transform normal distributions to normal distributions, so cannot model arbitrary densities.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Elementwise Flows}
+\begin{block}{Example}
+\[
+f[h, \phi] = \left(\sum_{k=1}^{b-1} \phi_k \right) + (h_b - b + 1) \phi_b,
+\]
+where \(h\) and \(\phi\) denote the input and parameters, respectively.
+\end{block}
+\vspace{0.4cm}
+\centering
+    \includegraphics[width=0.7\textwidth]{pictures/elementwiseflows.png}
+\end{frame}
+
+\begin{frame}{Coupling Flows}
+\begin{columns}[T,onlytextwidth]
+  \column{0.48\textwidth}
+  \begin{block}{Forward Mapping}
+    \[
+    h_1 = h'_1
+    \]
+    \[
+    h_2 = g\bigl[h'_2, \phi(h_1)\bigr]
+    \]
+  \end{block}
+
+  \column{0.48\textwidth}
+  \begin{block}{Inverse Mapping}
+    \[
+    h_1 = h'_1
+    \]
+    \[
+    h_2 = g^{-1}\bigl[h'_2, \phi(h_1)\bigr]
+    \]
+  \end{block}
+\end{columns}
+
+\vspace{0.4cm}
+
+\begin{center}
+  \includegraphics[width=0.7\textwidth]{pictures/couplingflows.png}
+\end{center}
+
+\end{frame}
+
+
+\begin{frame}{Autoregressive Flows}
+
+\begin{columns}[T,onlytextwidth]
+  \column{0.48\textwidth}
+  \begin{block}{Forward Mapping}
+    \[
+    h'_1 = g[h_1, \phi]
+    \]
+    \[
+    h'_2 = g[h_2, \phi(h_1)]
+    \]
+    \[
+    h'_3 = g[h_3, \phi(h_{1:2})]
+    \]
+    \[
+    h'_4 = g[h_4, \phi(h_{1:3})]
+    \]
+  \end{block}
+
+  \column{0.48\textwidth}
+  \begin{block}{Inverse Mapping}
+    \[
+    h_1 = g^{-1}[h'_1, \phi]
+    \]
+    \[
+    h_2 = g^{-1}[h'_2, \phi(h_1)]
+    \]
+    \[
+    h_3 = g^{-1}[h'_3, \phi(h_{1:2})]
+    \]
+    \[
+    h_4 = g^{-1}[h'_4, \phi(h_{1:3})]
+    \]
+  \end{block}
+\end{columns}
+
+\vspace{0.5cm}
+
+\begin{center}
+  \includegraphics[width=0.7\textwidth]{pictures/Autoregressive_Flows.png}
+\end{center}
+
+\end{frame}
+
+\begin{frame}{Additive Flows}
+\begin{columns}[T,onlytextwidth]
+  \column{0.48\textwidth}
+  \begin{block}{Forward Mapping}
+    \[
+    h'_1 = h_1 + f_1[h_2, \phi_1]
+    \]
+    \[
+    h'_2 = h_2 + f_2[h'_1, \phi_2]
+    \]
+  \end{block}
+
+  \column{0.48\textwidth}
+  \begin{block}{Inverse Mapping}
+    \[
+    h_2 = h'_2 - f_2[h'_1, \phi_2]
+    \]
+    \[
+    h_1 = h'_1 - f_1[h_2, \phi_1]
+    \]
+  \end{block}
+\end{columns}
+\vspace{0.5cm}
+\begin{center}
+  \includegraphics[width=0.7\textwidth]{pictures/multiscale.png}
+\end{center}
+\end{frame}
+
+
+
+\begin{frame}{Summary}
+  \centering
+  \includegraphics[width=0.7\textwidth]{pictures/Summary.png}\\[0.5cm]
+\end{frame}
+
+
+
+\begin{frame}{}
+
+  \begin{exampleblock}{Example Blocks}
+    Example blocks can be used to showcase code, examples, or case studies.
+  \end{exampleblock}
+  
+  \begin{alertblock}{Alert block}
+    Alert blocks draw attention to critical information, warnings, or caveats.
+  \end{alertblock}
+  
+  \begin{theorem}
+    In a right-angled triangle, the square of the hypotenuse equals the sum of squares of the other two sides.
+  \end{theorem}
+  
+  \begin{definition}
+    A prime number is a natural number greater than 1 that cannot be formed by multiplying two smaller natural numbers.
+  \end{definition}
+\end{frame}
+
 \section{Variational Autoencoders}
 \subsection{Maths}
 \begin{frame}{What are Autoencoders?}

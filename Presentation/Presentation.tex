@@ -11,17 +11,22 @@
 \usepackage[T1]{fontenc}
 % \usepackage[brazil]{babel}
 \usepackage{fix-cm}
+\usepackage{tikz}
 \usepackage{amsmath}
 \usepackage{mathtools}
 \usepackage{listings}
 \usepackage{xcolor}
 \usepackage{hyperref}
 \usepackage{graphicx} % Allows including images
-\usepackage{booktabs} % Allows the use of \toprule, \midrule and \bottomrule in tables
+\usepackage{amsmath}
 \usepackage{tikz}
-\usetikzlibrary{positioning, shapes, arrows, calc, decorations.pathreplacing, arrows.meta, backgrounds, patterns, overlay-beamer-styles}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric}
 \usepackage{etoolbox}
 \usepackage{animate}
+\documentclass{beamer}
+\usepackage{amsmath}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, shapes.geometric}
 
 %----------------------------------------------------------------------------------------
 %    LAYOUT CONFIGURATION
@@ -36,24 +41,11 @@
 
 \begin{document}
 
-\begin{frame}[plain]
-  \titlepage
-\end{frame}
-
-\begin{frame}[plain]{Topics}
-  \tableofcontents
-\end{frame}
-
-\section{Normalizing Flows}
-
-
 \begin{frame}{Core Idea}
   \begin{block}{Goal}
     Building realistic data distributions from a simple distribution via a flow of invertible transformations
   \end{block}
-  
   \vspace{0.3}
-  
   \begin{center}
     \includegraphics[width=0.7\textwidth]{pictures/nf_illustration}
   \end{center}
@@ -63,13 +55,10 @@
   \begin{block}{Goal}
     Building realistic data distributions from simple distributions via a flow of invertible transformations
   \end{block}
-  
   \vspace{0.3}
-  
   \begin{center}
     \includegraphics[width=0.7\textwidth]{pictures/nf_illustration}
   \end{center}
-  
   \begin{tikzpicture}[remember picture,overlay]
     \node at (current page.center) {
       \textcolor{red}{\scalebox{20}{?}}
@@ -77,24 +66,44 @@
   \end{tikzpicture}
 \end{frame}
 
-\begin{frame}{How does this work}
-Given:
-\begin{itemize}
-  \item Data points \( x_1, x_2, \ldots, x_n \)
-  \item A base distribution \( p_Z(z) \), typically standard normal
-  \item A bijective transformation \( f \) such that \( x = f(Z) \)
-\end{itemize}
 
-For each data point \( x \), we:
-\begin{enumerate}
-  \item Compute \( z = f^{-1}(x) \)
-  \item Evaluate \( p_Z(z) \) using the base density
-  \item Apply the change of variables formula to determine \(p_x(x)\):  
-  \[
-  p_X(x) = p_Z(z) \cdot \left| \det \left( \frac{\partial f^{-1}}{\partial x} \right) \right|
-  \]
-\end{enumerate}
+\begin{frame}{How does this work?}
+
+\small % Schriftgröße verkleinern
+
+\begin{columns}[T,onlytextwidth]
+  \column{0.48\textwidth}
+  \textbf{Given:}
+  \begin{itemize}
+    \item Data points \( x_1, \ldots, x_n \)
+    \item Base distribution \( p_Z(z) \) (standard normal)
+    \item Bijective transformation \( f \), \( x = f(z) \)
+  \end{itemize}
+  \column{0.48\textwidth}
+  \centering
+  \begin{tikzpicture}[
+      node distance=6mm and 12mm,
+      box/.style={draw, rounded corners, fill=blue!10, minimum width=2.8cm, minimum height=0.6cm, align=center, font=\scriptsize},
+      arrow/.style={-Stealth, thick, blue}
+    ]
+    % Nodes
+    \node[box] (x) {\(x\)};
+    \node[box, below=of x] (f_inv) {\(z = f^{-1}(x)\)};
+    \node[box, below=of f_inv] (pZ) {\(p_Z(z)\)};
+    \node[box, right=8mm of pZ] (jac) {\(\left|\det \frac{\partial f^{-1}}{\partial x}\right|\)};
+    \node[box, below=of pZ, xshift=8mm, fill=green!20] (px) {\(p_X(x) = p_Z(z) \cdot \left|\det \frac{\partial f^{-1}}{\partial x}\right|\)};
+    % Arrows
+    \draw[arrow] (x) -- (f_inv);
+    \draw[arrow] (f_inv) -- (pZ);
+    \draw[arrow] (f_inv.east) -- ++(6mm,0) |- (jac.north);
+    \draw[arrow] (pZ) -- (px.west);
+    \draw[arrow] (jac) -- (px.east);
+
+  \end{tikzpicture}
+\end{columns}
+
 \end{frame}
+
 
 
 \begin{frame}{What we learn}
@@ -315,6 +324,7 @@ where \(h\) and \(\phi\) denote the input and parameters, respectively.
     A prime number is a natural number greater than 1 that cannot be formed by multiplying two smaller natural numbers.
   \end{definition}
 \end{frame}
+\end{document}
 
 \section{Variational Autoencoders}
 \subsection{Maths}

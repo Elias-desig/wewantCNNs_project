@@ -1,13 +1,17 @@
-class NormaFlows(nn.Module):
-    def __init__(self, input):
+import torch
+import torch.nn as nn
+import numpy as np
+
+class NormalizingFlow(nn.Module):
+    def __init__(self, input_data):
         super().__init__()
-        input = torch.tensor(input, dtype=torch.float32)
+        input_tensor = torch.tensor(input_data, dtype=torch.float32)
 
-        self.values = input
-        self.weights = nn.Parameter(torch.rand(len(input)))
-        self.bias = nn.Parameter(torch.rand(len(input)))
+        self.values = input_tensor
+        self.weights = nn.Parameter(torch.rand(len(input_tensor)))
+        self.bias = nn.Parameter(torch.rand(len(input_tensor)))
 
-    def lin_flows(self):
+    def lin_flow(self):
         self.z = self.values * self.weights + self.bias
         return self.z
 
@@ -17,22 +21,19 @@ class NormaFlows(nn.Module):
         self.pz = coeff * torch.exp(exponent)
         return self.pz
 
-    def change_of_variable(self):
-        # log |det J| = Sum log |w_i| für diagonale Transformation
-        log_det_jacobian = torch.sum(torch.log(torch.abs(self.weights)))
-        self.log_px = torch.log(self.pz) + log_det_jacobian
+    def change_of_variable(self, log_det_jacobian):
+        self.log_px = torch.log(self.pz + 1e-8) + log_det_jacobian
         return self.log_px
 
-    def training_step(self, learning_rate=0.01):
-        # Loss = negative log-likelihood (NLL)
-        self.lin_flows()
+    def training_step(self, learning_rate=0.01, log_det_jacobian=0.0):
+        self.lin_flow()
         self.norm_prob()
-        log_px = self.change_of_variable()
-        loss = -nn.mean(log_px)
+        log_px = self.change_of_variable(log_det_jacobian)
 
-        # Optimieren
-        loss.backward()  # Gradienten berechnen
-        with nn.no_grad():
+        loss = -torch.mean(log_px)
+        loss.backward()
+
+        with torch.no_grad():
             self.weights -= learning_rate * self.weights.grad
             self.bias -= learning_rate * self.bias.grad
 

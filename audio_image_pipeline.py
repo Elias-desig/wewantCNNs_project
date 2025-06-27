@@ -3,13 +3,15 @@ import librosa.display
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
+import tarfile
+import os
 
 # to convert audio to spectrograms and save them as images.
 
 # Audio to Mel-Spectrogram Tensor
 def audio_to_melspectrogram(audio_path, sr=22050, n_mels=128, hop_length=512):
     y, sr = librosa.load(audio_path, sr=sr)
-    S = librosa.feature.melspectrogram(y, sr=sr, n_mels=n_mels, hop_length=hop_length)
+    S = librosa.feature.melspectrogram(y=y, sr=sr, n_mels=n_mels, hop_length=hop_length)
     S_dB = librosa.power_to_db(S, ref=np.max)
     return torch.tensor(S_dB, dtype=torch.float32)
 
@@ -34,4 +36,36 @@ def load_spectrogram_image(image_path):
     import torchvision.transforms as transforms
     image = Image.open(image_path).convert('L')
     transform = transforms.ToTensor()
-    return transform(image).squeeze(0) 
+    return transform(image).squeeze(0)
+# tensor = audio_to_melspectrogram('data/nsynth-valid/audio/bass_electronic_018-022-025.wav', 16000, 128, 512)
+# print(tensor.shape)
+# plt.imshow(tensor.numpy())
+# plt.show()
+def unpack_jsonwav_archive(archive_path, output_dir):
+    """
+    Unpack a .jsonwav.tar.gz archive, extracting only .wav and .json files.
+    """
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    with tarfile.open(archive_path, 'r:gz') as tar:
+        members = [m for m in tar.getmembers() if m.name.endswith(('.wav', '.json'))]
+        tar.extractall(path=output_dir, members=members)
+    print(f"Extracted {len(members)} files from {archive_path} to {output_dir}")
+# Nur zum testen!!
+if __name__ == "__main__":
+    # unpack once after cloning
+    unpack_jsonwav_archive(
+        'data/nsynth-valid.jsonwav.tar.gz',
+        'data/'
+    )
+    # example downstream usage
+    tensor = audio_to_melspectrogram(
+        'data/nsynth-valid/audio/bass_electronic_018-022-025.wav',
+        sr=16000, n_mels=128, hop_length=512
+    )
+    print(tensor.shape)
+    plt.figure(figsize=(10,4))
+    plt.imshow(tensor.numpy(), aspect='auto', cmap='magma')
+    plt.colorbar(format='%+2.0f dB')
+    plt.tight_layout()
+    plt.show()

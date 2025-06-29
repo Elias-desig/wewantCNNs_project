@@ -6,3 +6,6 @@ torch
 librosa
 soundfile
 torchvision
+omegaconf
+tqdm
+h5py

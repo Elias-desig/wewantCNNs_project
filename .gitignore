@@ -211,6 +211,7 @@ cython_debug/
 
 # Raw Audio files
 *.wav
+*.h5
 
 # Specific Files and Folders
 nsynth-train.jsonwav.tar.gz
@@ -220,3 +221,4 @@ data/nsynth-train
 data/nsynth-valid
 data/nsynth-test
 data/sample_subset
+logs

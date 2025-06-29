@@ -25,7 +25,7 @@ class Encoder(nn.Module):
     def forward(self, x):
         for i, layer in enumerate(self.linears):
             x = (layer(x))
-            if i < self.num_layers-1:
+            if i < len(self.activation_funcs):
                 x = self.activation_funcs[i](x)
         return x
 
@@ -44,7 +44,7 @@ class Decoder(nn.Module):
     def forward(self, x):
         for i, layer in enumerate(self.linears[:-1]):
             x = (layer(x))
-            if i < self.num_layers-1:
+            if i < len(self.activation_funcs):
                 x = self.activation_funcs[i](x)
         x = torch.sigmoid(self.linears[-1](x))
         return x

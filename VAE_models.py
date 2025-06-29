@@ -1,6 +1,9 @@
+from functions import layer_dimensions
+from dataclasses import dataclass
 import torch
 from torch import nn
-from functions import layer_dimensions
+import torch.nn.functional as F
+
 
 #What Works Now
 #VAE, Encoder, Decoder: All inherit from nn.Module and have correct method signatures.
@@ -10,29 +13,39 @@ from functions import layer_dimensions
 class Encoder(nn.Module):
     def __init__(self, in_dim, latent_dim, num_layers):
         super().__init__()
-        self.layer_dims = layer_dimensions(in_dim, latent_dim, num_layers)
+        self.in_dim = in_dim
+        self.latent_dim = latent_dim
+        self.num_layers = num_layers
+        self.layer_dims = layer_dimensions(in_dim, latent_dim * 2, num_layers) # times 2 to get mu, logvar 
         self.linears = nn.ModuleList([
             nn.Linear(self.layer_dims[i], self.layer_dims[i+1])
             for i in range(num_layers-1)
         ])
-        self.relus = nn.ModuleList([nn.ReLU() for _ in range(num_layers-1)])
+        self.activation_funcs = nn.ModuleList([nn.SiLU() for _ in range(num_layers-2)]) # (Num layers - 1) weight matrices, no activation function on last layer.
     def forward(self, x):
         for i, layer in enumerate(self.linears):
-            x = self.relus[i](layer(x))
+            x = (layer(x))
+            if i < self.num_layers-1:
+                x = self.activation_funcs[i](x)
         return x
 
 class Decoder(nn.Module):
     def __init__(self, latent_dim, out_dim, num_layers):
         super().__init__()
+        self.latent_dim = latent_dim
+        self.out_dim = out_dim
+        self.num_layers = num_layers
         self.layer_dims = layer_dimensions(latent_dim, out_dim, num_layers)
         self.linears = nn.ModuleList([
             nn.Linear(self.layer_dims[i], self.layer_dims[i+1])
             for i in range(num_layers-1)
         ])
-        self.relus = nn.ModuleList([nn.ReLU() for _ in range(num_layers-2)])
+        self.activation_funcs = nn.ModuleList([nn.SiLU() for _ in range(num_layers-2)])
     def forward(self, x):
         for i, layer in enumerate(self.linears[:-1]):
-            x = self.relus[i](layer(x))
+            x = (layer(x))
+            if i < self.num_layers-1:
+                x = self.activation_funcs[i](x)
         x = torch.sigmoid(self.linears[-1](x))
         return x
 
@@ -40,18 +53,75 @@ class VAE(nn.Module):
     def __init__(self, in_dim, latent_dim, n_layers):
         super().__init__()
         self.encoder = Encoder(in_dim, latent_dim, n_layers)
-        self.mu = nn.Linear(latent_dim, latent_dim)
-        self.log_var = nn.Linear(latent_dim, latent_dim)
         self.decoder = Decoder(latent_dim, in_dim, n_layers)
-    def reparameterization(self, mu, log_var):
-        std = torch.exp(0.5 * log_var)
-        eps = torch.randn_like(std)
-        return mu + std * eps
-    def forward(self, x):
+        self.softplus = nn.Softplus()
+
+    def encode(self, x, eps: float = 1e-8):
         encoded = self.encoder(x)
-        mu = self.mu(encoded)
-        log_var = self.log_var(encoded)
-        z = self.reparameterization(mu, log_var)
+        mu, logvar = torch.chunk(encoded, 2, dim=-1)
+        scale = self.softplus(logvar) + eps
+        scale_tril = torch.diag_embed(scale)
+        return torch.distributions.MultivariateNormal(mu, scale_tril=scale_tril)
+    
+    def reparameterize(self, dist):
+        return dist.rsample()
+            
+    def decode(self, z):
         decoded = self.decoder(z)
-        return encoded, mu, log_var, decoded
+        return decoded
+
+    def forward(self, x, compute_loss: bool = True):
+        dist = self.encode(x)
+        z = self.reparameterize(dist)
+        recon_x = self.decode(z)
+
+        if not compute_loss:
+            return VAEOutput(
+                z_dist=dist,
+                z_sample=z,
+                x_recon=recon_x,
+                loss=None,
+                loss_recon=None,
+                loss_kl=None,
+            )
+        # compute loss terms 
+        loss_recon = F.binary_cross_entropy(recon_x, x, reduction='none').sum(-1).mean()
+        std_normal = torch.distributions.MultivariateNormal(
+            torch.zeros_like(z, device=z.device),
+            scale_tril=torch.eye(z.shape[-1], device=z.device).unsqueeze(0).expand(z.shape[0], -1, -1),
+        )
+        loss_kl = torch.distributions.kl.kl_divergence(dist, std_normal).mean()
+                
+        loss = loss_recon + loss_kl
+        
+        return VAEOutput(
+            z_dist=dist,
+            z_sample=z,
+            x_recon=recon_x,
+            loss=loss,
+            loss_recon=loss_recon,
+            loss_kl=loss_kl,
+        )
+
+
+@dataclass
+class VAEOutput:
+    """
+    Dataclass for VAE output.
+    
+    Attributes:
+        z_dist (torch.distributions.Distribution): The distribution of the latent variable z.
+        z_sample (torch.Tensor): The sampled value of the latent variable z.
+        x_recon (torch.Tensor): The reconstructed output from the VAE.
+        loss (torch.Tensor): The overall loss of the VAE.
+        loss_recon (torch.Tensor): The reconstruction loss component of the VAE loss.
+        loss_kl (torch.Tensor): The KL divergence component of the VAE loss.
+    """
+    z_dist: torch.distributions.Distribution
+    z_sample: torch.Tensor
+    x_recon: torch.Tensor
+    
+    loss: torch.Tensor | None
+    loss_recon: torch.Tensor | None
+    loss_kl: torch.Tensor | None
     

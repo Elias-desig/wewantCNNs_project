@@ -213,6 +213,10 @@ cython_debug/
 *.wav
 
 # Specific Files and Folders
+nsynth-train.jsonwav.tar.gz
 nsynth-valid.jsonwav.tar.gz
+nsynth-test.jsonwav.tar.gz
+data/nsynth-train
 data/nsynth-valid
+data/nsynth-test
 data/sample_subset

@@ -20,7 +20,7 @@ def train(model, dataloader, optimizer, prev_updates, config, device, writer=Non
     
     for batch_idx, data in enumerate(tqdm(dataloader)):
         n_upd = prev_updates + batch_idx
-        data = data.view(data.size(0), -1).to(device, non_blocking=True)
+        data = data.view(data.size(0), -1).to(device)
         
         optimizer.zero_grad()  # Zero the gradients
         
@@ -85,16 +85,17 @@ def test(model, dataloader, cur_step, config, device, writer=None):
     test_kl_loss /= len(dataloader)
     print(f'====> Test set loss: {test_loss:.4f} (BCE: {test_recon_loss:.4f}, KLD: {test_kl_loss:.4f})')
     
+    H, W = dataloader.dataset[0].shape
     if writer is not None:
         writer.add_scalar('Loss/Test', test_loss, global_step=cur_step)
         writer.add_scalar('Loss/Test/BCE', output.loss_recon.item(), global_step=cur_step)
         writer.add_scalar('Loss/Test/KLD', output.loss_kl.item(), global_step=cur_step)
         
         # Log reconstructions
-        writer.add_images('Test/Reconstructions', output.x_recon.view(-1, 1, 28, 28), global_step=cur_step)
-        writer.add_images('Test/Originals', data.view(-1, 1, 28, 28), global_step=cur_step)
+        writer.add_images('Test/Reconstructions', output.x_recon.view(-1, 1, H, W), global_step=cur_step)
+        writer.add_images('Test/Originals', data.view(-1, 1, H, W), global_step=cur_step)
         
         # Log random samples from the latent space
         z = torch.randn(16, config.vae.latent_dim).to(device)
         samples = model.decode(z)
-        writer.add_images('Test/Samples', samples.view(-1, 1, 28, 28), global_step=cur_step)
+        writer.add_images('Test/Samples', samples.view(-1, 1, H, W), global_step=cur_step)

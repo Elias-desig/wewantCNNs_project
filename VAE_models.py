@@ -124,4 +124,6 @@ class VAEOutput:
     loss: torch.Tensor | None
     loss_recon: torch.Tensor | None
     loss_kl: torch.Tensor | None
+
+def count_parameters(model): return sum(p.numel() for p in model.parameters() if p.requires_grad)
     

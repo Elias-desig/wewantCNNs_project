@@ -9,3 +9,4 @@ torchvision
 omegaconf
 tqdm
 h5py
+tensorboard

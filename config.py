@@ -6,8 +6,8 @@ import os
 
 @dataclass
 class VAEConf:
-    latent_dim: int= 32
-    n_layers: int= 3
+    latent_dim: int= 8
+    n_layers: int= 2
     beta_kl: float= 1.0
     batch_size: int = 128
     lr: float = 1e-3

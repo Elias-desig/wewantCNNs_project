@@ -6,6 +6,8 @@ import os
 import h5py
 # Custom Dataset for audio files
 def find_audio_files(folder, exts={'.wav', '.mp3', '.flac'}):
+    if not os.path.isdir(folder):
+        raise OSError('Audio path does not exist')
     files = []
     for root, _, filenames in os.walk(folder):
         for f in filenames:
@@ -13,7 +15,7 @@ def find_audio_files(folder, exts={'.wav', '.mp3', '.flac'}):
                 files.append(os.path.join(root, f))
     return files
 
-class SpectrogramDataset(Dataset):
+class SpectogramDataset(Dataset):
     def __init__(self, audio_folder):
         self.audio_files = find_audio_files(audio_folder)
     def __len__(self):

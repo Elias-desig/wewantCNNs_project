@@ -193,28 +193,11 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
-# LaTeX intermediates
-*.aux
-*.bbl
-*.blg
-*.idx
-*.ind
-*.ilg
-*.lof
-*.lot
-*.out
-*.toc
-*.nav
-*.snm
 
-# latexmk and SyncTeX
-*.fls
-*.fdb_latexmk
 *.synctex.gz
 
 # logs, backups, other
 *.log
-*.gz
 *.run.xml
 *.bcf
 *.xdv
@@ -225,3 +208,17 @@ cython_debug/
 *.bak
 *.swp
 .DS_Store
+
+# Raw Audio files
+*.wav
+*.h5
+
+# Specific Files and Folders
+nsynth-train.jsonwav.tar.gz
+nsynth-valid.jsonwav.tar.gz
+nsynth-test.jsonwav.tar.gz
+data/nsynth-train
+data/nsynth-valid
+data/nsynth-test
+data/sample_subset
+logs

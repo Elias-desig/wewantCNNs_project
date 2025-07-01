@@ -40,3 +40,6 @@ The data_work notebook showcaes the data and how to work with it.
 ## Credits:
 
 Autoencoder Model inspired by: https://hunterheidenreich.com/posts/modern-variational-autoencoder-in-pytorch/
+Dataset:  Jesse Engel, Cinjon Resnick, Adam Roberts, Sander Dieleman, Douglas Eck,
+Karen Simonyan, and Mohammad Norouzi. "Neural Audio Synthesis of Musical Notes
+with WaveNet Autoencoders." 2017.

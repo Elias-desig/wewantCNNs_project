@@ -6,7 +6,7 @@ import os
 
 @dataclass
 class VAEConf:
-    latent_dim: int= 8
+    latent_dim: int= 64
     n_layers: int= 2
     beta_kl: float= 1.0
     batch_size: int = 128
@@ -20,7 +20,7 @@ class NFConf:
 class DataConf:
     train_audio_folder: str = 'data/nsynth-train/audio'
     test_audio_folder: str = 'data/nsynth-test/audio'
-    val_aduio_folder: str = 'data/nsynth-val/audio'
+    val_audio_folder: str = 'data/nsynth-valid/audio'
     sample_rate: int = 16000
     n_mels: int = 128
     hop_length: int = 512

@@ -27,22 +27,30 @@ class SpectogramDataset(Dataset):
 class HDF5SpectrogramDataset(Dataset):
     def __init__(self, hdf5_file):
         self.hdf5_file = hdf5_file
-        # Open file handle that will be reused
-        self.f = h5py.File(hdf5_file, 'r')
-        self.spectrograms = self.f['spectrograms']
-        self.length = len(self.spectrograms)
+        self.length = None
+        self._file_handle = None
+        
+        # Get length from main process
+        with h5py.File(hdf5_file, 'r') as f:
+            self.length = len(f['spectrograms'])
+    
+    def _get_file_handle(self):
+        """Lazy loading of file handle per worker"""
+        if self._file_handle is None:
+            self._file_handle = h5py.File(self.hdf5_file, 'r')
+        return self._file_handle
         
     def __len__(self):
         return self.length
         
     def __getitem__(self, idx):
-        # HDF5 supports random access - this is very fast!
-        spec = torch.from_numpy(self.spectrograms[idx]).float()
+        f = self._get_file_handle()
+        spec = torch.from_numpy(f['spectrograms'][idx]).float()
         return spec
     
     def __del__(self):
-        if hasattr(self, 'f'):
-            self.f.close()
+        if self._file_handle is not None:
+            self._file_handle.close()
 
 
 def collate_fn(batch):

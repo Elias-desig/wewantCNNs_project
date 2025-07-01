@@ -46,15 +46,16 @@ class Decoder(nn.Module):
             x = (layer(x))
             if i < len(self.activation_funcs):
                 x = self.activation_funcs[i](x)
-        x = torch.sigmoid(self.linears[-1](x))
+        x = self.linears[-1](x) # removed sigmoid because of amp numerical instability (see loss)
         return x
 
 class VAE(nn.Module):
-    def __init__(self, in_dim, latent_dim, n_layers):
+    def __init__(self, in_dim, latent_dim, n_layers, beta=1.0):
         super().__init__()
         self.encoder = Encoder(in_dim, latent_dim, n_layers)
         self.decoder = Decoder(latent_dim, in_dim, n_layers)
         self.softplus = nn.Softplus()
+        self.beta = beta
 
     def encode(self, x, eps: float = 1e-8):
         encoded = self.encoder(x)
@@ -79,25 +80,25 @@ class VAE(nn.Module):
             return VAEOutput(
                 z_dist=dist,
                 z_sample=z,
-                x_recon=recon_x,
+                x_recon=torch.sigmoid(recon_x),
                 loss=None,
                 loss_recon=None,
                 loss_kl=None,
             )
         # compute loss terms 
-        loss_recon = F.binary_cross_entropy(recon_x, x, reduction='none').sum(-1).mean()
+        loss_recon = F.binary_cross_entropy_with_logits(recon_x, x, reduction='none').sum(-1).mean()
         std_normal = torch.distributions.MultivariateNormal(
             torch.zeros_like(z, device=z.device),
             scale_tril=torch.eye(z.shape[-1], device=z.device).unsqueeze(0).expand(z.shape[0], -1, -1),
         )
-        loss_kl = torch.distributions.kl.kl_divergence(dist, std_normal).mean()
+        loss_kl = self.beta * torch.distributions.kl.kl_divergence(dist, std_normal).mean()
                 
         loss = loss_recon + loss_kl
         
         return VAEOutput(
             z_dist=dist,
             z_sample=z,
-            x_recon=recon_x,
+            x_recon=torch.sigmoid(recon_x),
             loss=loss,
             loss_recon=loss_recon,
             loss_kl=loss_kl,
@@ -127,3 +128,18 @@ class VAEOutput:
 
 def count_parameters(model): return sum(p.numel() for p in model.parameters() if p.requires_grad)
     
+def load_vae_model(checkpoint_path, device):
+    """Load VAE model from checkpoint"""
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+    
+    # Recreate model
+    model = VAE(
+        checkpoint['config']['in_dim'],
+        checkpoint['config']['latent_dim'], 
+        checkpoint['config']['n_layers']
+    ).to(device)
+    
+    # Load weights
+    model.load_state_dict(checkpoint['model_state_dict'])
+    
+    return model, checkpoint

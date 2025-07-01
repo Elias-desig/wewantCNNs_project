@@ -1,4 +1,5 @@
 import torch
+from torch import autocast, amp
 from VAE_models import VAE
 from audio_image_pipeline import audio_to_melspectrogram, melspectrogram_to_audio, save_spectrogram_image
 import soundfile as sf
@@ -16,20 +17,20 @@ def train(model, dataloader, optimizer, prev_updates, config, device, writer=Non
         loss_fn: The loss function.
         optimizer: The optimizer.
     """
+    use_amp = True
     model.train()  # Set the model to training mode
-    
+    scaler = amp.GradScaler("cuda", enabled=use_amp)
+
+
     for batch_idx, data in enumerate(tqdm(dataloader)):
         n_upd = prev_updates + batch_idx
-        data = data.view(data.size(0), -1).to(device)
+        data = data.view(data.size(0), -1).to(device, non_blocking=True)
+        with autocast(device_type="cuda", dtype=torch.float16, enabled=use_amp):
+            output = model(data)  # Forward pass
+            loss = output.loss
         
-        optimizer.zero_grad()  # Zero the gradients
-        
-        output = model(data)  # Forward pass
-        loss = output.loss
-        
-        loss.backward()
-        
-        if n_upd % 100 == 0:
+        scaler.scale(loss).backward()
+        if n_upd % 500 == 0:
             # Calculate and log gradient norms
             total_norm = 0.0
             for p in model.parameters():
@@ -45,13 +46,13 @@ def train(model, dataloader, optimizer, prev_updates, config, device, writer=Non
                 writer.add_scalar('Loss/Train', loss.item(), global_step)
                 writer.add_scalar('Loss/Train/BCE', output.loss_recon.item(), global_step)
                 writer.add_scalar('Loss/Train/KLD', output.loss_kl.item(), global_step)
-                writer.add_scalar('GradNorm/Train', total_norm, global_step)
-            
+                writer.add_scalar('GradNorm/Train', total_norm, global_step)        
+        scaler.unscale_(optimizer)
         # gradient clipping
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)    
-        
-        optimizer.step()  # Update the model parameters
-        
+        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0) 
+        scaler.step(optimizer)
+        scaler.update()
+        optimizer.zero_grad(set_to_none=True)        
     return prev_updates + len(dataloader)
 
 def test(model, dataloader, cur_step, config, device, writer=None):

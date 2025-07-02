@@ -7,7 +7,7 @@ import numpy as np
 from tqdm import tqdm
 
 
-def train(model, dataloader, optimizer, prev_updates, config, device, writer=None):
+def train(model, dataloader, optimizer, prev_updates, config, device, writer=None, conv=False):
     """
     Trains the model on the given data.
     
@@ -24,7 +24,12 @@ def train(model, dataloader, optimizer, prev_updates, config, device, writer=Non
 
     for batch_idx, data in enumerate(tqdm(dataloader)):
         n_upd = prev_updates + batch_idx
-        data = data.view(data.size(0), -1).to(device, non_blocking=True)
+
+        data = data.to(device, non_blocking=True)
+        if not conv:
+            data = data.view(data.size(0), -1) # Flatten data when not using convolutional VAE
+        else:
+            data = data.view(data.size(0), 1, data.size(1), data.size(2)) # (batch, 1, h, w)
         with autocast(device_type="cuda", dtype=torch.float16, enabled=use_amp):
             output = model(data)  # Forward pass
             loss = output.loss
@@ -55,7 +60,7 @@ def train(model, dataloader, optimizer, prev_updates, config, device, writer=Non
         optimizer.zero_grad(set_to_none=True)        
     return prev_updates + len(dataloader)
 
-def test(model, dataloader, cur_step, config, device, writer=None):
+def test(model, dataloader, cur_step, config, device, writer=None, conv=False):
     """
     Tests the model on the given data.
     
@@ -73,8 +78,10 @@ def test(model, dataloader, cur_step, config, device, writer=None):
     with torch.no_grad():
         for data in tqdm(dataloader, desc='Testing'):
             data = data.to(device)
-            data = data.view(data.size(0), -1)  # Flatten the data
-            
+            if not conv:
+                data = data.view(data.size(0), -1)  # Flatten the data when not using convolutional VAE
+            else:
+                data = data.view(data.size(0), 1, data.size(1), data.size(2))
             output = model(data, compute_loss=True)  # Forward pass
             
             test_loss += output.loss.item()
@@ -95,8 +102,9 @@ def test(model, dataloader, cur_step, config, device, writer=None):
         # Log reconstructions
         writer.add_images('Test/Reconstructions', output.x_recon.view(-1, 1, H, W), global_step=cur_step)
         writer.add_images('Test/Originals', data.view(-1, 1, H, W), global_step=cur_step)
-        
+    
         # Log random samples from the latent space
         z = torch.randn(16, config.vae.latent_dim).to(device)
         samples = model.decode(z)
         writer.add_images('Test/Samples', samples.view(-1, 1, H, W), global_step=cur_step)
+    return test_loss

@@ -203,6 +203,7 @@ cython_debug/
 *.xdv
 *.vrb
 *.json
+*.pt
 
 # Editors & OS
 *~

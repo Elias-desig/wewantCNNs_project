@@ -20,3 +20,7 @@ def layer_dimensions(a, b, steps):
     for d in deltas:
         out.append(out[-1] + d)
     return out
+def conv_dimension(h, w, padding, kernel_size, stride):
+    H_out = ((h + 2*padding - (kernel_size -1) -1) // stride)+1
+    W_out = ((w + 2*padding - (kernel_size -1) -1) // stride)+1
+    return H_out, W_out

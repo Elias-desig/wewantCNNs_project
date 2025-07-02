@@ -8,7 +8,7 @@ import os
 class VAEConf:
     latent_dim: int= 64
     n_layers: int= 2
-    beta_kl: float= 1.0
+    beta_kl: float= 0.1
     batch_size: int = 128
     lr: float = 1e-3
     weight_decay: float = 1e-2

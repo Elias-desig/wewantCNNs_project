@@ -63,9 +63,8 @@ class VAE(nn.Module):
     def encode(self, x, eps: float = 1e-8):
         encoded = self.encoder(x)
         mu, logvar = torch.chunk(encoded, 2, dim=-1)
-        scale = self.softplus(logvar) + eps
-        scale_tril = torch.diag_embed(scale)
-        return torch.distributions.MultivariateNormal(mu, scale_tril=scale_tril)
+        std = (0.5 * logvar).exp() + eps
+        return torch.distributions.Independent(torch.distributions.Normal(mu, std), 1)
     
     def reparameterize(self, dist):
         return dist.rsample()
@@ -77,26 +76,27 @@ class VAE(nn.Module):
     def forward(self, x, compute_loss: bool = True):
         dist = self.encode(x)
         z = self.reparameterize(dist)
-        recon_x = self.decode(z)
+        recon_logits = self.decode(z)
 
         if not compute_loss:
             return VAEOutput(
                 z_dist=dist,
                 z_sample=z,
-                x_recon=torch.sigmoid(recon_x),
+                x_recon=torch.sigmoid(recon_logits),
                 loss=None,
                 loss_recon=None,
                 loss_kl=None,
             )
         # compute loss terms 
-        loss_recon = F.binary_cross_entropy_with_logits(recon_x, x, reduction='none')
+        loss_recon = F.mse_loss(recon_logits, x, reduction='none')
         if x.ndim == 4:
             loss_recon = loss_recon.sum(dim=(1,2,3)).mean() # sum over all dims except batch for conv output
         else:
             loss_recon = loss_recon.sum(-1).mean() # sum over last dimension for flat output
-        std_normal = torch.distributions.MultivariateNormal(
-            torch.zeros_like(z, device=z.device),
-            scale_tril=torch.eye(z.shape[-1], device=z.device).unsqueeze(0).expand(z.shape[0], -1, -1),
+        std_normal = torch.distributions.Independent(
+            torch.distributions.Normal(
+                torch.zeros_like(z), torch.ones_like(z)
+            ), 1
         )
         loss_kl = self.beta * torch.distributions.kl.kl_divergence(dist, std_normal).mean()
                 
@@ -105,7 +105,7 @@ class VAE(nn.Module):
         return VAEOutput(
             z_dist=dist,
             z_sample=z,
-            x_recon=torch.sigmoid(recon_x),
+            x_recon=torch.sigmoid(recon_logits),
             loss=loss,
             loss_recon=loss_recon,
             loss_kl=loss_kl,

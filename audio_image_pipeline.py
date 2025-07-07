@@ -53,6 +53,30 @@ def unpack_jsonwav_archive(archive_path, output_dir):
         members = [m for m in tar.getmembers() if m.name.endswith(('.wav', '.json'))]
         tar.extractall(path=output_dir, members=members)
     print(f"Extracted {len(members)} files from {archive_path} to {output_dir}")
+def preprocess_to_hdf5(audio_folder, output_file):
+    """Convert audio files to spectrograms and store in HDF5 - minimal version"""
+    audio_files = find_audio_files(audio_folder)
+    
+    # Get dimensions from first file
+    sample = audio_to_melspectrogram(audio_files[0])
+    n_mels, target_frames = sample.shape
+    
+    with h5py.File(output_file, 'w') as f:
+        # Create dataset without compression for fastest access
+        spectrograms = f.create_dataset(
+            'spectrograms', 
+            shape=(len(audio_files), n_mels, target_frames),
+            dtype=np.float32
+        )
+        
+        # Process all files at once
+        for i, audio_file in enumerate(tqdm(audio_files)):
+            S = audio_to_melspectrogram(audio_file)
+            S = (S + 80) / 80  # Normalize to [0,1]
+            spectrograms[i] = S.numpy()
+    
+    print(f"Preprocessed {len(audio_files)} files to {output_file}")
+
 # Nur zum testen!!
 if __name__ == "__main__":
     # unpack once after cloning

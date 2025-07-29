@@ -5,7 +5,10 @@ import torch
 import matplotlib.pyplot as plt
 import tarfile
 import os
-
+import sys
+import h5py
+from tqdm import tqdm
+from datasets import find_audio_files
 # to convert audio to spectrograms and save them as images.
 
 # Audio to Mel-Spectrogram Tensor
@@ -39,10 +42,7 @@ def load_spectrogram_image(image_path):
     image = Image.open(image_path).convert('L')
     transform = transforms.ToTensor()
     return transform(image).squeeze(0)
-# tensor = audio_to_melspectrogram('data/nsynth-valid/audio/bass_electronic_018-022-025.wav', 16000, 128, 512)
-# print(tensor.shape)
-# plt.imshow(tensor.numpy())
-# plt.show()
+
 def unpack_jsonwav_archive(archive_path, output_dir):
     """
     Unpack a .jsonwav.tar.gz archive, extracting only .wav and .json files.
@@ -53,21 +53,54 @@ def unpack_jsonwav_archive(archive_path, output_dir):
         members = [m for m in tar.getmembers() if m.name.endswith(('.wav', '.json'))]
         tar.extractall(path=output_dir, members=members)
     print(f"Extracted {len(members)} files from {archive_path} to {output_dir}")
-# Nur zum testen!!
+
+def preprocess_to_hdf5(audio_folder, output_file, even=True):
+    """Convert audio files to spectrograms and store in HDF5 - minimal version"""
+    audio_files = find_audio_files(audio_folder)
+    
+    # Get dimensions from first file
+    sample = audio_to_melspectrogram(audio_files[0])
+    n_mels, sample_frames = sample.shape
+    if even and sample_frames % 2 == 1:
+        target_frames = sample_frames - 1
+    else:
+        target_frames = sample_frames
+
+    with h5py.File(output_file, 'w') as f:
+        # Create dataset without compression for fastest access
+        spectrograms = f.create_dataset(
+            'spectrograms', 
+            shape=(len(audio_files), n_mels, target_frames),
+            dtype=np.float32
+        )
+        
+        # Process all files at once
+        for i, audio_file in enumerate(tqdm(audio_files)):
+            S = audio_to_melspectrogram(audio_file)
+            S = (S + 80) / 80  # Normalize to [0,1]
+            spectrograms[i] = S[:,:target_frames].numpy()
+    
+    print(f"Preprocessed {len(audio_files)} files to {output_file}")
+
 if __name__ == "__main__":
-    # unpack once after cloning
-    unpack_jsonwav_archive(
-        'data/nsynth-valid.jsonwav.tar.gz',
-        'data/'
-    )
-    # example downstream usage
-    tensor = audio_to_melspectrogram(
-        'data/nsynth-valid/audio/bass_electronic_018-022-025.wav',
-        sr=16000, n_mels=128, hop_length=512
-    )
-    print(tensor.shape)
-    plt.figure(figsize=(10,4))
-    plt.imshow(tensor.numpy(), aspect='auto', cmap='magma')
-    plt.colorbar(format='%+2.0f dB')
-    plt.tight_layout()
-    plt.show()
+    '''Give compressed tar dataset and output file dir + name to process 
+        mp3 audio files to spectrograms of even dimensions in HDF5.
+    '''
+    if len(sys.argv) == 3:
+        
+        unpack_jsonwav_archive(
+            sys.argv[1],
+            'data/'
+        )
+        extracted_data = sys.argv[1].split('.')[0] + '/audio'
+        
+        # Create output directory if it doesn't exist
+        output_dir = os.path.dirname(sys.argv[2])
+        if output_dir and not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        preprocess_to_hdf5(extracted_data, sys.argv[2])
+        print(f'Done! file can be found at {sys.argv[2]}')
+    else:
+        raise NameError('Please provide 2 arguments, tarfile location and output file path')
+        

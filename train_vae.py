@@ -2,8 +2,7 @@ import torch
 from torch import autocast, amp
 from VAE_models import VAE
 from audio_image_pipeline import audio_to_melspectrogram, melspectrogram_to_audio, save_spectrogram_image
-import soundfile as sf
-import numpy as np
+import math
 from tqdm import tqdm
 
 
@@ -107,4 +106,8 @@ def test(model, dataloader, cur_step, config, device, writer=None, conv=False):
         z = torch.randn(16, config.vae.latent_dim).to(device)
         samples = model.decode(z)
         writer.add_images('Test/Samples', samples.view(-1, 1, H, W), global_step=cur_step)
-    return test_loss
+    return test_loss, test_recon_loss, test_kl_loss
+
+def simple_kl_annealing(epoch):
+    beta = torch.sigmoid(torch.tensor(epoch - 10.0)) * 3
+    return float(beta.clamp(min=1e-2))

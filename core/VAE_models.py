@@ -110,7 +110,8 @@ class VAE(nn.Module):
             loss_recon=loss_recon,
             loss_kl=loss_kl,
         )
-
+    def set_beta(self, beta):
+        self.beta = beta
 class CVAE_Encoder(nn.Module):
     def __init__(self, image_size, latent_dim):
         super().__init__()

@@ -1,6 +1,15 @@
 import torch
 import torch.nn as nn
 import numpy as np
+from dataclasses import dataclass
+
+@dataclass
+class MaskedFlowOutput:
+    z: torch.Tensor
+    s: torch.Tensor
+    log_det: torch.Tensor
+    log_px: torch.Tensor | None = None
+    loss: torch.Tensor | None = None
 
 class MaskedLinear(nn.Linear):
     def __init__(self, in_features, out_features, bias=True): 
@@ -41,15 +50,38 @@ class MLP_Masked(nn.Module):
             self.architecture.append(layer)
             in_dim = h_dim
 
-        # Output layer: 2 * input_dim, to split it into s and t such that we can use them as input phi for our invertible function
-        self.output_layer = MaskedLinear(in_dim, 2 * input_dim) # we make the output layer 2 times bigger than the input layer since out convertable function needs s and t!!!
+        self.output_layer = MaskedLinear(in_dim, 2 * input_dim)
         out_mask = create_autoregressive_mask(in_dim, 2 * input_dim)
         self.output_layer.set_mask(out_mask)
 
-    def forward(self, x):
+    def forward(self, x, compute_loss=False):
+        out = x
         for layer in self.architecture:
-            x = layer(x)
-        return self.output_layer(x) 
+            out = layer(out)
+        output = self.output_layer(out)
+
+        dim = x.shape[1]
+        s = output[:, :dim]
+        t = output[:, dim:]
+        s = torch.clamp(s, min=-5, max=5)
+        z = (x - t) * torch.exp(-s)
+
+        log_p_z = norm_log_prob(z)
+        log_det = log_det_jacobian(s)
+        log_px = change_of_variable(log_p_z, log_det)
+
+        if compute_loss:
+            loss = Loss(log_px)
+            return MaskedFlowOutput(
+                z=z,
+                s=s,
+                log_det=log_det,
+                log_px=log_px,
+                loss=loss
+            )
+        else:
+            # Nur die Vorhersage zurückgeben (z, s etc.)
+            return z, s, log_det, log_px
     
 def invertible_function(output_of_network, real_data):
     dim = real_data.shape[1]

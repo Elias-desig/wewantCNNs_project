@@ -33,7 +33,7 @@ def create_autoregressive_mask(in_features, out_features):
 
 # Neuronal Netowrk on which we apply to mask 
 class MLP_Masked(nn.Module):
-    def __init__(self, input_dim=22144, hidden_dims=[1024, 1024]):
+    def __init__(self, input_dim=22016, hidden_dims=[1024, 1024]):
         super().__init__()
         self.architecture = nn.ModuleList()
         in_dim = input_dim
@@ -82,20 +82,20 @@ class MLP_Masked(nn.Module):
         else:
             # Nur die Vorhersage zurückgeben (z, s etc.)
             return z, s, log_det, log_px
-    
+
 def invertible_function(output_of_network, real_data):
     dim = real_data.shape[1]
     s = output_of_network[:, :dim]
     t = output_of_network[:, dim:]
-    
-    # we have to seet boundaries for s otherwise it goes into millions or milliarden idk 
+
+    # we have to seet boundaries for s otherwise it goes into millions or milliarden idk
     s = torch.clamp(s, min=-5, max=5)
-    
+
     z = (real_data - t) * torch.exp(-s)
     return z, s
 
 def norm_log_prob(z, mean=0.0, std_dev=1.0):
-    pi = torch.tensor(np.pi, dtype=z.dtype, device=z.device)  
+    pi = torch.tensor(np.pi, dtype=z.dtype, device=z.device)
     coeff = -0.5 * torch.log(2 * pi) - torch.log(torch.tensor(std_dev, dtype=z.dtype, device=z.device))
     exponent = -0.5 * ((z - mean) / std_dev) ** 2
     return coeff + exponent

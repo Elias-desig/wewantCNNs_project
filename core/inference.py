@@ -1,7 +1,7 @@
 from VAE_models import load_vae_model, CVAE, VAE
-from audio_image_pipeline import 
 import sys
 import torch
+from nf_model import MLP_Masked
 
 
 
@@ -35,9 +35,36 @@ def reconstruction(model, samples, conv:bool):
             samples = samples.view(dims[0], -1)
         outputs = model(samples, compute_loss=False)
         recon = outputs.x_recon
-        latent_sample
+        #latent_sample
         if not conv and len(samples.size) > 1:
             recon = recon.view(dims)
     return recon
 
-def_
+
+def load_nf_model(device):
+    checkpoint_path = "/models/nf_checkpoint_20250731-002053.pt"
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+
+    input_dim = checkpoint['config']['input_dim']
+    hidden_dims = checkpoint['config']['hidden_dims']
+
+    model = MLP_Masked(input_dim=input_dim, hidden_dims=hidden_dims).to(device)
+    model.load_state_dict(checkpoint['model_state_dict'])
+
+    return model.eval()
+
+def invert_flow(model: MLP_Masked, z: torch.Tensor) -> torch.Tensor:
+    model.eval()
+    batch_size, dim = z.size()
+    x_recon = torch.zeros_like(z)
+
+    with torch.no_grad():
+        for i in range(dim):
+            x_partial = x_recon.clone()
+            output = model.output_layer(x_partial)
+            s = output[:, :dim]
+            t = output[:, dim:]
+            s = torch.clamp(s, min=-5, max=5)
+            x_recon[:, i] = z[:, i] * torch.exp(s[:, i]) + t[:, i]
+
+    return x_recon

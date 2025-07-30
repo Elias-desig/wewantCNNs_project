@@ -41,14 +41,27 @@ def reconstruction(model, model_type:str, samples, conv:bool):
                 dims = samples.size()
                 samples = samples.view(dims[0], -1)
             outputs = model(samples, compute_loss=False)
+            # image reconstruction 
             recon = outputs.x_recon
-            latent_sample = outputs.
+            # latent space code 
+            latent_sample = outputs.z_sample
             if not conv and len(samples.size) > 1:
                 recon = recon.view(dims)
         if model_type == 'NF':
             pass
         else:
             raise NameError('Provide valid model type!')
-    return recon
+    return recon, latent_sample
 
-def_
+def generate(model, model_type:str, latent_sample, output_dim:tuple[str], conv:bool):
+    model.eval()
+    with torch.no_grad():
+        if model_type == 'VAE':
+            images = model.decode(latent_sample)
+        if not conv:
+            images = images.view(images.size(0), output_dim)
+        elif model_type == 'NF':
+            pass
+        else:
+            raise NameError('Provide valid model type!')        
+    return images

@@ -1,128 +1,31 @@
 import torch
-from torch import autocast, amp
-from tqdm import tqdm
+from torch.utils.data import DataLoader
+from nf_model import MLP_Masked  # dein Model importieren
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+# Hyperparameter
+num_epochs = 20
+learning_rate = 1e-3
+batch_size = 32
+
+model = MLP_Masked(input_dim=22144, hidden_dims=[1024, 1024]).to(device)
+optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+
+model.train()
 for epoch in range(num_epochs):
-    model.train()
-    for batch in loader: 
+    running_loss = 0.0
+    for batch in train_loader:
+        batch = batch.to(device).float()
+        batch = batch.view(batch.size(0), -1)  # Flatten falls nötig
+
         optimizer.zero_grad()
+        output = model(batch, compute_loss=True)
+        loss = output.loss
 
-        batch = batch.float()  # only if necessary to be on the safe side not on the side of dave vadea 
-
-        batch_flat = batch.view(batch.size(0), -1) 
-
-        out = model(batch_flat) 
-
-        z, s = invertible_function(out, batch_flat)
-
-        log_p_z = norm_log_prob(z)
-        log_det = log_det_jacobian(s)
-        log_p_x = change_of_variable(log_p_z, log_det) 
-
-        loss = Loss(log_p_x) 
         loss.backward()
         optimizer.step()
 
-    print(f"Epoch {epoch+1}/{num_epochs}, Loss: {loss.item():.4f}, z.mean: {z.mean().item():.4f}, s.mean: {s.mean().item():.4f}")
+        running_loss += loss.item()
 
-
-
-
-def train(model, dataloader, optimizer, prev_updates, config, device, writer=None):
-    """
-    Trains the model on the given data.
-    
-    Args:
-        model (nn.Module): The model to train.
-        dataloader (torch.utils.data.DataLoader): The data loader.
-        loss_fn: The loss function.
-        optimizer: The optimizer.
-    """
-    use_amp = True
-    model.train()  # Set the model to training mode
-    scaler = amp.GradScaler("cuda", enabled=use_amp)
-
-
-    for batch_idx, data in enumerate(tqdm(dataloader)):
-        n_upd = prev_updates + batch_idx
-
-        data = data.to(device, non_blocking=True)
-        data = data.view(data.size(0), -1) # Flatten data when not using convolutional VAE
-        with autocast(device_type="cuda", dtype=torch.float16, enabled=use_amp):
-            output = model(data)  # Forward pass
-            loss = output.loss
-        
-        scaler.scale(loss).backward()
-        if n_upd % 500 == 0:
-            # Calculate and log gradient norms
-            total_norm = 0.0
-            for p in model.parameters():
-                if p.grad is not None:
-                    param_norm = p.grad.data.norm(2)
-                    total_norm += param_norm.item() ** 2
-            total_norm = total_norm ** (1. / 2)
-        
-            print(f'Step {n_upd:,} (N samples: {n_upd*config.vae.batch_size:,}), Loss: {loss.item():.4f} (Recon: {output.loss_recon.item():.4f}, KL: {output.loss_kl.item():.4f}) Grad: {total_norm:.4f}')
-
-            if writer is not None:
-                global_step = n_upd
-                writer.add_scalar('Loss/Train', loss.item(), global_step)
-                writer.add_scalar('Loss/Train/BCE', output.loss_recon.item(), global_step)
-                writer.add_scalar('Loss/Train/KLD', output.loss_kl.item(), global_step)
-                writer.add_scalar('GradNorm/Train', total_norm, global_step)        
-        scaler.unscale_(optimizer)
-        # gradient clipping
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0) 
-        scaler.step(optimizer)
-        scaler.update()
-        optimizer.zero_grad(set_to_none=True)        
-    return prev_updates + len(dataloader)
-
-def test(model, dataloader, cur_step, config, device, writer=None, conv=False):
-    """
-    Tests the model on the given data.
-    
-    Args:
-        model (nn.Module): The model to test.
-        dataloader (torch.utils.data.DataLoader): The data loader.
-        cur_step (int): The current step.
-        writer: The TensorBoard writer.
-    """
-    model.eval()  # Set the model to evaluation mode
-    test_loss = 0
-    test_recon_loss = 0
-    test_kl_loss = 0
-    
-    with torch.no_grad():
-        for data in tqdm(dataloader, desc='Testing'):
-            data = data.to(device)
-            if not conv:
-                data = data.view(data.size(0), -1)  # Flatten the data when not using convolutional VAE
-            else:
-                data = data.view(data.size(0), 1, data.size(1), data.size(2))
-            output = model(data, compute_loss=True)  # Forward pass
-            
-            test_loss += output.loss.item()
-            test_recon_loss += output.loss_recon.item()
-            test_kl_loss += output.loss_kl.item()
-            
-    test_loss /= len(dataloader)
-    test_recon_loss /= len(dataloader)
-    test_kl_loss /= len(dataloader)
-    print(f'====> Test set loss: {test_loss:.4f} (BCE: {test_recon_loss:.4f}, KLD: {test_kl_loss:.4f})')
-    
-    H, W = dataloader.dataset[0].shape
-    if writer is not None:
-        writer.add_scalar('Loss/Test', test_loss, global_step=cur_step)
-        writer.add_scalar('Loss/Test/BCE', output.loss_recon.item(), global_step=cur_step)
-        writer.add_scalar('Loss/Test/KLD', output.loss_kl.item(), global_step=cur_step)
-        
-        # Log reconstructions
-        writer.add_images('Test/Reconstructions', output.x_recon.view(-1, 1, H, W), global_step=cur_step)
-        writer.add_images('Test/Originals', data.view(-1, 1, H, W), global_step=cur_step)
-    
-        # Log random samples from the latent space
-        z = torch.randn(16, config.vae.latent_dim).to(device)
-        samples = model.decode(z)
-        writer.add_images('Test/Samples', samples.view(-1, 1, H, W), global_step=cur_step)
-    return test_loss, test_recon_loss, test_kl_loss    
+    avg_loss = running_loss / len(train_loader)
+    print(f"Epoch {epoch+1}/{num_epochs}, Loss: {avg_loss:.4f}")

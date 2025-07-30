@@ -4,13 +4,17 @@ from nf_model import MLP_Masked  # import our wonderful model that hopefully wil
 from datetime import datetime
 import os
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') # cuda for nivida grafikkarten since cuda is the shit
-def save_checkpoint(model, optimizer, epoch, loss, input_dim, hidden_dims, conv=False): # inspired by the checkpoint method from core/vae models
-    if not os.path.isdir('./models'):
-        os.mkdir('./models')
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    folder = './models/nf_model'
+
+
+def save_checkpoint(model, optimizer, epoch, loss, input_dim, hidden_dims, conv=False):
+    if not os.path.isdir('/Users/koraygecimli/PycharmProjects/UDL_demo/wewantCNNs_project/models'):
+        os.mkdir('/Users/koraygecimli/PycharmProjects/UDL_demo/wewantCNNs_project/models')
+
+    folder = '/Users/koraygecimli/PycharmProjects/UDL_demo/wewantCNNs_project/models/nf_model'
     if not os.path.isdir(folder):
         os.mkdir(folder)
+
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
 
     checkpoint = {
         'epoch': epoch,
@@ -24,6 +28,7 @@ def save_checkpoint(model, optimizer, epoch, loss, input_dim, hidden_dims, conv=
         },
         'timestamp': timestamp
     }
+
     torch.save(checkpoint, f'{folder}/nf_checkpoint_{timestamp}.pt')
     print(f"Checkpoint saved at epoch {epoch + 1}")
 

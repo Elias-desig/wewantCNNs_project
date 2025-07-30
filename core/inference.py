@@ -1,4 +1,6 @@
 from VAE_models import load_vae_model, CVAE, VAE
+from nf_model import MLP_Masked
+from audio_image_pipeline import
 import sys
 import torch
 from nf_model import MLP_Masked
@@ -20,24 +22,34 @@ def load_model(checkpoint_path, device, model_type):
             checkpoint['config']['latent_dim'], 
             checkpoint['config']['n_layers']
         ).to(device)        
-    
+    elif model_type == 'NF':
+        model = MLP_Masked(
+            checkpoint['config']['input_dim'],
+            checkpoint['config']['hidden_dim'],
+            checkpoint['config']['conv']
+        ).to(device)
     # Load weights
     model.load_state_dict(checkpoint['model_state_dict'])
     
     return model, checkpoint
 
-def reconstruction(model, samples, conv:bool):
+def reconstruction(model, model_type:str, samples, conv:bool):
 
     model.eval()
     with torch.no_grad():
-        if not conv and len(samples.size) > 1:
-            dims = samples.size()
-            samples = samples.view(dims[0], -1)
-        outputs = model(samples, compute_loss=False)
-        recon = outputs.x_recon
-        #latent_sample
-        if not conv and len(samples.size) > 1:
-            recon = recon.view(dims)
+        if model_type == 'VAE':
+            if not conv and len(samples.size) > 1:
+                dims = samples.size()
+                samples = samples.view(dims[0], -1)
+            outputs = model(samples, compute_loss=False)
+            recon = outputs.x_recon
+            latent_sample = outputs.
+            if not conv and len(samples.size) > 1:
+                recon = recon.view(dims)
+        if model_type == 'NF':
+            pass
+        else:
+            raise NameError('Provide valid model type!')
     return recon
 
 

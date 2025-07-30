@@ -1,4 +1,5 @@
 from VAE_models import load_vae_model, CVAE, VAE
+from audio_image_pipeline import 
 import sys
 import torch
 
@@ -25,8 +26,14 @@ def load_model(checkpoint_path, device, model_type):
     
     return model, checkpoint
 
-if __name__ == "main":
-    model_type = sys.argv[0]
-    checkpoint = sys.argv[1]
-    if model_type == 'vae'
-    model = load_model()
+def inference(model, samples, conv:bool):
+
+    model.eval()
+    with torch.no_grad():
+        if not conv and len(samples.size) > 1:
+            samples = samples.view(samples.size(0), -1)
+        outputs = model(samples, compute_loss=False)
+        recon = outputs.x_recon
+    return outputs
+
+def_

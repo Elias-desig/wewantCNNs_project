@@ -8,7 +8,7 @@ num_epochs = 20
 learning_rate = 1e-3
 batch_size = 32
 
-model = MLP_Masked(input_dim=22144, hidden_dims=[1024, 1024]).to(device)
+model = MLP_Masked(input_dim=128*172, hidden_dims=[1024, 1024]).to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
 model.train()

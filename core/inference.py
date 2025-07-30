@@ -26,18 +26,23 @@ def load_model(checkpoint_path, device, model_type):
     
     return model, checkpoint
 
-def reconstruction(model, samples, conv:bool):
+def reconstruction(model, model_type:str, samples, conv:bool):
 
     model.eval()
     with torch.no_grad():
-        if not conv and len(samples.size) > 1:
-            dims = samples.size()
-            samples = samples.view(dims[0], -1)
-        outputs = model(samples, compute_loss=False)
-        recon = outputs.x_recon
-        latent_sample
-        if not conv and len(samples.size) > 1:
-            recon = recon.view(dims)
+        if model_type == 'VAE':
+            if not conv and len(samples.size) > 1:
+                dims = samples.size()
+                samples = samples.view(dims[0], -1)
+            outputs = model(samples, compute_loss=False)
+            recon = outputs.x_recon
+            latent_sample = outputs.
+            if not conv and len(samples.size) > 1:
+                recon = recon.view(dims)
+        if model_type == 'NF':
+            pass
+        else:
+            raise NameError('Provide valid model type!')
     return recon
 
 def_

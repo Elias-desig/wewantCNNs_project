@@ -1,4 +1,5 @@
 from VAE_models import load_vae_model, CVAE, VAE
+from nf_model import MLP_Masked
 from audio_image_pipeline import 
 import sys
 import torch
@@ -20,7 +21,12 @@ def load_model(checkpoint_path, device, model_type):
             checkpoint['config']['latent_dim'], 
             checkpoint['config']['n_layers']
         ).to(device)        
-    
+    elif model_type == 'NF':
+        model = MLP_Masked(
+            checkpoint['config']['input_dim'],
+            checkpoint['config']['hidden_dim'],
+            checkpoint['config']['conv']
+        ).to(device)
     # Load weights
     model.load_state_dict(checkpoint['model_state_dict'])
     

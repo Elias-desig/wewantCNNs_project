@@ -26,14 +26,18 @@ def load_model(checkpoint_path, device, model_type):
     
     return model, checkpoint
 
-def inference(model, samples, conv:bool):
+def reconstruction(model, samples, conv:bool):
 
     model.eval()
     with torch.no_grad():
         if not conv and len(samples.size) > 1:
-            samples = samples.view(samples.size(0), -1)
+            dims = samples.size()
+            samples = samples.view(dims[0], -1)
         outputs = model(samples, compute_loss=False)
         recon = outputs.x_recon
-    return outputs
+        latent_sample
+        if not conv and len(samples.size) > 1:
+            recon = recon.view(dims)
+    return recon
 
 def_

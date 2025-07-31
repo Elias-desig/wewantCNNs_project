@@ -172,7 +172,122 @@ class CVAE(VAE):
         self.encoder = CVAE_Encoder(image_size, latent_dim)
         self.decoder = CVAE_Decoder(image_size, latent_dim)
 
+class CVAE_Encoder_Deep(nn.Module):
+    def __init__(self, image_size, latent_dim):
+        super().__init__()
+        self.image_size = image_size  # [128, 172]
+        self.latent_dim = latent_dim
+        
+        # Calculate dimensions through the network
+        # Input: 128×172
+        self.conv1 = spectral_norm(nn.Conv2d(1, 64, 4, stride=2, padding=1))     # 64×86
+        self.conv2 = spectral_norm(nn.Conv2d(64, 128, 4, stride=2, padding=1))   # 32×43
+        self.conv3 = spectral_norm(nn.Conv2d(128, 256, 4, stride=2, padding=1))  # 16×22 (note: 43//2 + 1 = 22)
+        self.conv4 = spectral_norm(nn.Conv2d(256, 512, 4, stride=2, padding=1))  # 8×11
+        
+        # Calculate final feature map size
+        size1 = conv_dimension(*image_size, padding=1, stride=2, kernel_size=4)      # 64×86
+        size2 = conv_dimension(*size1, padding=1, stride=2, kernel_size=4)           # 32×43  
+        size3 = conv_dimension(*size2, padding=1, stride=2, kernel_size=4)           # 16×22
+        size4 = conv_dimension(*size3, padding=1, stride=2, kernel_size=4)           # 8×11
+        
+        self.final_size = size4
+        
+        # Group normalization layers
+        self.gn1 = nn.GroupNorm(8, 64)
+        self.gn2 = nn.GroupNorm(16, 128)
+        self.gn3 = nn.GroupNorm(32, 256)
+        self.gn4 = nn.GroupNorm(32, 512)
+        
+        # Linear layer for mu and logvar
+        self.linear = nn.Linear(512 * size4[0] * size4[1], latent_dim * 2)
+        
+    def forward(self, x):
+        x = F.silu(self.gn1(self.conv1(x)))
+        x = F.silu(self.gn2(self.conv2(x)))
+        x = F.silu(self.gn3(self.conv3(x)))
+        x = F.silu(self.gn4(self.conv4(x)))
+        
+        x = torch.flatten(x, start_dim=1)
+        x = self.linear(x)
+        return x
 
+class CVAE_Decoder_Deep(nn.Module):
+    def __init__(self, image_size, latent_dim):
+        super().__init__()
+        self.image_size = image_size  # [128, 172]
+        self.latent_dim = latent_dim
+        
+        # Calculate the sizes we need to hit at each upsampling step
+        # We want to go: 8×11 -> 16×22 -> 32×43 -> 64×86 -> 128×172
+        size1 = conv_dimension(*image_size, padding=1, stride=2, kernel_size=4)      # 64×86
+        size2 = conv_dimension(*size1, padding=1, stride=2, kernel_size=4)           # 32×43
+        size3 = conv_dimension(*size2, padding=1, stride=2, kernel_size=4)           # 16×22
+        size4 = conv_dimension(*size3, padding=1, stride=2, kernel_size=4)           # 8×11
+        
+        self.size1 = size1
+        self.size2 = size2
+        self.size3 = size3
+        self.size4 = size4
+        
+        # Initial projection
+        self.linear = nn.Linear(latent_dim, 512 * size4[0] * size4[1])
+        
+        # Decoder blocks with careful size management
+        self.deconv1 = spectral_norm(nn.ConvTranspose2d(512, 256, 4, stride=2, padding=1))
+        self.deconv2 = spectral_norm(nn.ConvTranspose2d(256, 128, 4, stride=2, padding=1))
+        self.deconv3 = spectral_norm(nn.ConvTranspose2d(128, 64, 4, stride=2, padding=1))
+        self.deconv4 = spectral_norm(nn.ConvTranspose2d(64, 32, 4, stride=2, padding=1))
+        
+        # Additional refinement layers
+        self.refine1 = spectral_norm(nn.Conv2d(256, 256, 3, padding=1))
+        self.refine2 = spectral_norm(nn.Conv2d(128, 128, 3, padding=1))
+        self.refine3 = spectral_norm(nn.Conv2d(64, 64, 3, padding=1))
+        self.refine4 = spectral_norm(nn.Conv2d(32, 32, 3, padding=1))
+        
+        # Group normalization
+        self.gn1 = nn.GroupNorm(32, 256)
+        self.gn2 = nn.GroupNorm(16, 128)
+        self.gn3 = nn.GroupNorm(8, 64)
+        self.gn4 = nn.GroupNorm(8, 32)
+        
+        # Final output layer
+        self.final_conv = spectral_norm(nn.Conv2d(32, 1, 3, padding=1))
+        
+    def forward(self, x):
+        batch_size = x.size(0)
+        
+        # Project to feature map
+        x = self.linear(x)
+        x = x.view(batch_size, 512, self.size4[0], self.size4[1])
+        
+        # Decoder path with explicit output sizes
+        x = self.deconv1(x, output_size=(batch_size, 256, *self.size3))  # 8×11 -> 16×22
+        x = F.silu(self.gn1(self.refine1(x)))
+        
+        x = self.deconv2(x, output_size=(batch_size, 128, *self.size2))  # 16×22 -> 32×43
+        x = F.silu(self.gn2(self.refine2(x)))
+        
+        x = self.deconv3(x, output_size=(batch_size, 64, *self.size1))   # 32×43 -> 64×86
+        x = F.silu(self.gn3(self.refine3(x)))
+        
+        x = self.deconv4(x, output_size=(batch_size, 32, *self.image_size))  # 64×86 -> 128×172
+        x = F.silu(self.gn4(self.refine4(x)))
+        
+        # Final output
+        x = self.final_conv(x)
+        
+        # Ensure exact output size (safety check)
+        if x.shape[-2:] != tuple(self.image_size):
+            x = F.interpolate(x, size=self.image_size, mode='bilinear', align_corners=False)
+            
+        return x
+
+class CVAE_Deep(VAE):
+    def __init__(self, image_size, latent_dim, beta=1.0):
+        super().__init__(in_dim=1, latent_dim=latent_dim, n_layers=2, beta=beta)
+        self.encoder = CVAE_Encoder_Deep(image_size, latent_dim)
+        self.decoder = CVAE_Decoder_Deep(image_size, latent_dim)
 @dataclass
 class VAEOutput:
     """
@@ -196,32 +311,12 @@ class VAEOutput:
 
 def count_parameters(model): return sum(p.numel() for p in model.parameters() if p.requires_grad)
     
-def load_vae_model(checkpoint_path, device, conv):
-    """Load VAE model from checkpoint"""
-    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
-    
-    if conv:
-        model = CVAE(
-            checkpoint['config']['image_size'],
-            checkpoint['config']['latent_dim'], 
-        ).to(device)
-    else:
-        model = VAE(
-            checkpoint['config']['in_dim'],
-            checkpoint['config']['latent_dim'], 
-            checkpoint['config']['n_layers']
-        ).to(device)        
-    
-    # Load weights
-    model.load_state_dict(checkpoint['model_state_dict'])
-    
-    return model, checkpoint
 
-def save_checkpoint(model, optimizer, epoch, loss, config, conv, in_dims):
+def save_checkpoint(model, optimizer, epoch, loss, config, in_dims):
     if not os.path.isdir('./models'):
         os.mkdir('./models')
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    if conv:
+    if isinstance(model, CVAE):
         if not os.path.isdir('./models/conv_vae'):
             os.mkdir('./models/conv_vae')
         checkpoint ={
@@ -239,7 +334,25 @@ def save_checkpoint(model, optimizer, epoch, loss, config, conv, in_dims):
                     }
         torch.save(checkpoint, f'./models/conv_vae/c_vae_checkpoint_{timestamp}.pt')
         print(f'Model saved at: ./models/conv_vae/c_vae_checkpoint_{timestamp}.pt')    
-    else:
+    elif isinstance(model, CVAE_Deep):
+        if not os.path.isdir('./models/deep_conv_vae'):
+            os.mkdir('./models/deep_conv_vae')
+        checkpoint ={
+                    'epoch': epoch,
+                    'model_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'loss': loss,
+                    'config': {
+                        'image_size': in_dims,
+                        'latent_dim': config.vae.latent_dim,
+                        'batch_size': config.vae.batch_size,
+                        'lr': config.vae.lr
+                    },
+                    'timestamp': timestamp            
+                    }
+        torch.save(checkpoint, f'./models/deep_conv_vae/deep_c_vae_checkpoint_{timestamp}.pt')
+        print(f'Model saved at: ./models/deep_conv_vae/deep_c_vae_checkpoint_{timestamp}.pt')           
+    elif isinstance(model, VAE):
         if not os.path.isdir('./models/vae'):
             os.mkdir('./models/vae')            
         checkpoint ={

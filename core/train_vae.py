@@ -1,6 +1,5 @@
 import torch
 from torch import autocast, amp
-import math
 from tqdm import tqdm
 
 try:

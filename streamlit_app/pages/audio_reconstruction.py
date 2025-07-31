@@ -16,7 +16,7 @@ with open(metadata_file, 'r') as f:
 
 df = pd.DataFrame(data).T
 df.columns = df.columns.astype(str)
-model_options = st.selectbox("Select a Model (CVAE recommended)", ["VAE", "CVAE", "NF"])
+model_options = st.selectbox("Select a Model (CVAE recommended)", ["VAE", "CVAE", "CVAE_Deep"])
 quality_options = ['bright', 'dark', 'distortion', 'fast_decay', 'long_release', 'multiphonic', 'nonlinear_env', 'percussive', 'reverb', 'tempo-synced']
 st.header('Select a sample as a starting point:')
 instrument_source = st.selectbox('Instrument Source', ['acoustic', 'electronic', 'synthetic'])

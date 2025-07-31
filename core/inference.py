@@ -1,5 +1,5 @@
 from pathlib import Path
-from .VAE_models import CVAE, VAE
+from .VAE_models import CVAE, VAE, CVAE_Deep
 from .nf_model import MLP_Masked
 import torch
 
@@ -19,11 +19,15 @@ def load_model(checkpoint_path, device, model_type):
             checkpoint['config']['latent_dim'],
             checkpoint['config']['n_layers']
         ).to(device)
+    elif model_type == 'CVAE_Deep':
+        model = CVAE_Deep(
+            checkpoint['config']['in_dim'],
+            checkpoint['config']['latent_dim'],
+        ).to(device)        
     elif model_type == 'NF':
         model = MLP_Masked(
             checkpoint['config']['input_dim'],
-            checkpoint['config']['hidden_dim'],
-            checkpoint['config']['conv']
+            checkpoint['config']['hidden_dims'],
         ).to(device)
     # Load weights
     model.load_state_dict(checkpoint['model_state_dict'])
@@ -97,7 +101,8 @@ def select_model(model_type, device=None):
     patterns = {
         'VAE':  '*vae_checkpoint_*.pt',
         'CVAE': '*c_vae_checkpoint_*.pt',
-        'NF':   '*nf_checkpoint_*.pt'
+        'NF':   '*nf_checkpoint_*.pt',
+        'CVAE_Deep': '*deep_c_vae_checkpoint_*.pt'
     }
     try:
         pat = patterns[model_type]

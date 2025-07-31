@@ -1,72 +1,58 @@
+from pathlib import Path
 from .VAE_models import CVAE, VAE
 from .nf_model import MLP_Masked
-from .audio_image_pipeline import audio_to_melspectrogram, melspectrogram_to_audio
-import sys
-from pathlib import Path
 import torch
-
-
 
 
 def load_model(checkpoint_path, device, model_type):
     """Load VAE model from checkpoint"""
     checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
-    model = None
+
     if model_type == 'CVAE':
         model = CVAE(
             checkpoint['config']['image_size'],
-            checkpoint['config']['latent_dim'], 
+            checkpoint['config']['latent_dim'],
         ).to(device)
     elif model_type == 'VAE':
         model = VAE(
             checkpoint['config']['in_dim'],
-            checkpoint['config']['latent_dim'], 
+            checkpoint['config']['latent_dim'],
             checkpoint['config']['n_layers']
-        ).to(device)        
+        ).to(device)
     elif model_type == 'NF':
         model = MLP_Masked(
             checkpoint['config']['input_dim'],
             checkpoint['config']['hidden_dim'],
             checkpoint['config']['conv']
         ).to(device)
-    else:
-        raise ValueError(f'Not a valid model type:{model_type!r}')
     # Load weights
     model.load_state_dict(checkpoint['model_state_dict'])
-    
+
     return model, checkpoint
 
-def reconstruction(model, model_type:str, sample_path:str, conv:bool):
-    even = model_type == 'CVAE'
-    sample = audio_to_melspectrogram(sample_path, even=even)
-    device = next(model.parameters()).device
-    sample = sample.to(device)
+
+def reconstruction(model, model_type: str, samples, conv: bool):
     model.eval()
     with torch.no_grad():
-        if model_type == 'VAE' or model_type == 'CVAE':
-            if conv:
-                sample = sample.unsqueeze(0).unsqueeze(0)
-            if not conv:
-                dims = sample.size()
-                sample = sample.view(1, -1)
-            outputs = model(sample, compute_loss=False)
-            recon = outputs.x_recon.cpu()
-            z = outputs.z_sample
-
-            # Reshape the output correctly
-            if conv:
-                recon = recon.squeeze(0).squeeze(0)
-            else:
-                recon = recon.view(128, 173)
-        elif model_type == 'NF':
+        if model_type == 'VAE':
+            if not conv and len(samples.size) > 1:
+                dims = samples.size()
+                samples = samples.view(dims[0], -1)
+            outputs = model(samples, compute_loss=False)
+            # image reconstruction
+            recon = outputs.x_recon
+            # latent space code
+            latent_sample = outputs.z_sample
+            if not conv and len(samples.size) > 1:
+                recon = recon.view(dims)
+        if model_type == 'NF':
             pass
         else:
-            raise ValueError(f'Provide valid model type!{model_type}')
-    audio = melspectrogram_to_audio(recon)
+            raise NameError('Provide valid model type!')
+    return recon, latent_sample
 
-    return audio, recon, z
 
-def generate(model, model_type:str, latent_sample, output_dim:tuple[str], conv:bool):
+def generate(model, model_type: str, latent_sample, output_dim: tuple[str], conv: bool):
     model.eval()
     with torch.no_grad():
         if model_type == 'VAE':
@@ -76,11 +62,12 @@ def generate(model, model_type:str, latent_sample, output_dim:tuple[str], conv:b
         elif model_type == 'NF':
             pass
         else:
-            raise NameError('Provide valid model type!')        
+            raise NameError('Provide valid model type!')
     return images
 
+
 def load_nf_model(device):
-    checkpoint_path = "/Users/koraygecimli/PycharmProjects/UDL_demo/wewantCNNs_project/models/nf_checkpoint_20250731-002053.pt"
+    checkpoint_path = "/Users/koraygecimli/PycharmProjects/UDL_demo/wewantCNNs_project/models/nf_checkpoint_20250731-021809.pt" #absolute path
     checkpoint = torch.load(checkpoint_path, map_location=device)
 
     input_dim = checkpoint['config']['input_dim']
@@ -88,32 +75,16 @@ def load_nf_model(device):
 
     model = MLP_Masked(input_dim=input_dim, hidden_dims=hidden_dims).to(device)
     model.load_state_dict(checkpoint['model_state_dict'])
-
-    return model.eval()
-
-
-def invert_flow(model: MLP_Masked, z: torch.Tensor, device) -> torch.Tensor:
     model.eval()
-    batch_size, dim = z.size()
-    x_recon = torch.zeros_like(z).to(device)
 
+    return model, input_dim
+
+
+def sample_from_flow(model, input_dim, device, batch_size=1):
+    z = torch.randn(batch_size, input_dim, device=device)
     with torch.no_grad():
-        for i in range(dim):
-            # x_partial enthält bisher rekonstruierte Features, der Rest ist 0
-            x_partial = x_recon.clone()
-
-            # Feature i wird jetzt berechnet, also Model auf x_partial forwarden
-            out = x_partial
-            for layer in model.architecture:
-                out = layer(out)
-            output = model.output_layer(out)
-
-            s = torch.clamp(output[:, :dim], min=-5, max=5)
-            t = output[:, dim:]
-
-            x_recon[:, i] = z[:, i] * torch.exp(s[:, i]) + t[:, i]
-
-    return x_recon
+        x_sample = model.inverse(z)
+    return x_sample
 
 
 

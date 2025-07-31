@@ -11,12 +11,6 @@ import torch.nn.functional as F
 from torch.nn.utils import spectral_norm
 
 
-
-#What Works Now
-#VAE, Encoder, Decoder: All inherit from nn.Module and have correct method signatures.
-#Layer Construction: Linear layers are now built with correct input/output sizes.
-#Forward Pass: The VAE can now encode, sample, and decode.
-
 class Encoder(nn.Module):
     def __init__(self, in_dim, latent_dim, num_layers):
         super().__init__()
@@ -243,7 +237,8 @@ def save_checkpoint(model, optimizer, epoch, loss, config, conv, in_dims):
                     },
                     'timestamp': timestamp            
                     }
-        torch.save(checkpoint, f'./models/conv_vae/c_vae_checkpoint_{timestamp}.pt')    
+        torch.save(checkpoint, f'./models/conv_vae/c_vae_checkpoint_{timestamp}.pt')
+        print(f'Model saved at: ./models/conv_vae/c_vae_checkpoint_{timestamp}.pt')    
     else:
         if not os.path.isdir('./models/vae'):
             os.mkdir('./models/vae')            
@@ -261,4 +256,5 @@ def save_checkpoint(model, optimizer, epoch, loss, config, conv, in_dims):
                     },
                     'timestamp': timestamp            
                     }
-        torch.save(checkpoint, f'./models/vae/vae_checkpoint_{timestamp}.pt')   
+        torch.save(checkpoint, f'./models/vae/vae_checkpoint_{timestamp}.pt')
+        print(f'Model saved at: ./models/vae/vae_checkpoint_{timestamp}.pt')   

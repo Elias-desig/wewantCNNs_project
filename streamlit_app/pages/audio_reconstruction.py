@@ -53,10 +53,7 @@ if event and event.selection and event.selection.rows:
     fig, ax = plt.subplots()
     ax.imshow(audio_to_melspectrogram(path))
     st.pyplot(fig)    
-    audio, reconstructed, latent_z = reconstruction(model, model_options,
-    path    ,
-        model_options == 'CVAE'
-    )
+    audio, reconstructed, latent_z = reconstruction(model, model_options, path, (model_options == 'CVAE' or model_options == 'CVAE_Deep'))
     st.write('Audio reconstruction')
     st.audio(audio, format="audio/wav", sample_rate=16000)
     fig, ax = plt.subplots()

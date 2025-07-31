@@ -1,6 +1,7 @@
 import torch
 from torch import autocast, amp
 from tqdm import tqdm
+import numpy as np
 
 try:
     from .audio_image_pipeline import audio_to_melspectrogram, melspectrogram_to_audio, save_spectrogram_image
@@ -111,15 +112,7 @@ def test(model, dataloader, cur_step, config, device, writer=None, conv=False):
         writer.add_images('Test/Samples', samples.view(-1, 1, H, W), global_step=cur_step)
     return test_loss, test_recon_loss, test_kl_loss
 
-def simple_kl_annealing(epoch, max_epoch=50):
-    if epoch < max_epoch / 10:
-        return 0.01  # Very low beta initially
-    elif epoch < (max_epoch / 10) * 3:
-        # Linear increase
-        return 0.01 + (epoch - 5) * (0.5 - 0.01) / 10
-    elif epoch < (max_epoch / 10) * 6:
-        # Higher beta for stronger disentanglement
-        return 0.5 + (epoch - 15) * (2.0 - 0.5) / 15
-    else:
-        # Very high beta for final epochs
-        return min(5.0, 2.0 + (epoch - 30) * 0.15)
+def simple_kl_annealing(epoch, max_epoch=50, num_cycles=3):
+    slope = 0.1 * epoch
+    beta = np.max([np.sin((epoch / max_epoch) * 2.0 * np.pi * num_cycles) * slope, 0.01])
+    return beta

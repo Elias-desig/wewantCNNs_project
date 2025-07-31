@@ -1,6 +1,7 @@
 from pathlib import Path
 from .VAE_models import CVAE, VAE, CVAE_Deep
 from .nf_model import MLP_Masked
+from .audio_image_pipeline import audio_to_melspectrogram, melspectrogram_to_audio
 import torch
 
 
@@ -21,7 +22,7 @@ def load_model(checkpoint_path, device, model_type):
         ).to(device)
     elif model_type == 'CVAE_Deep':
         model = CVAE_Deep(
-            checkpoint['config']['in_dim'],
+            checkpoint['config']['image_size'],
             checkpoint['config']['latent_dim'],
         ).to(device)        
     elif model_type == 'NF':
@@ -35,25 +36,45 @@ def load_model(checkpoint_path, device, model_type):
     return model, checkpoint
 
 
-def reconstruction(model, model_type: str, samples, conv: bool):
+def reconstruction(model, model_type:str, sample_path:str, conv:bool):
+
+    sample = audio_to_melspectrogram(sample_path, even=True)
+    original_shape = sample.shape
+    # normalize
+    min = sample.min()
+    max = sample.max()
+    sample = (sample - min) / (max - min + 1e-8)
+
+    device = next(model.parameters()).device
+    sample = sample.to(device)
     model.eval()
+
     with torch.no_grad():
-        if model_type == 'VAE':
-            if not conv and len(samples.size) > 1:
-                dims = samples.size()
-                samples = samples.view(dims[0], -1)
-            outputs = model(samples, compute_loss=False)
-            # image reconstruction
-            recon = outputs.x_recon
-            # latent space code
-            latent_sample = outputs.z_sample
-            if not conv and len(samples.size) > 1:
-                recon = recon.view(dims)
-        if model_type == 'NF':
+        if model_type in ['VAE', 'CVAE', 'CVAE_Deep']:
+            if conv:
+                sample = sample.unsqueeze(0).unsqueeze(0)
+            if not conv:
+                
+                sample = sample.view(1, -1)
+            outputs = model(sample, compute_loss=False)
+            recon = outputs.x_recon.cpu()
+            z = outputs.z_sample.cpu()
+            # Reshape the output 
+            if conv:
+                recon = recon.squeeze(0).squeeze(0)  # [1, 1, H, W] -> [H, W]
+            else:
+                recon = recon.view(original_shape)  # [1, H*W] -> [H, W]
+            # denormalize
+            recon = recon * (max - min) + min
+
+        elif model_type == 'NF':
             pass
         else:
-            raise NameError('Provide valid model type!')
-    return recon, latent_sample
+            raise ValueError(f'Provide valid model type!{model_type}')
+
+    recon = torch.clamp(recon, -80.0, 0.0)
+    audio = melspectrogram_to_audio(recon)
+    return audio, recon, z
 
 
 def generate(model, model_type: str, latent_sample, output_dim: tuple[str], conv: bool):

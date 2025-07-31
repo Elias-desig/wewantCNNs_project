@@ -145,22 +145,23 @@ class CVAE_Encoder(nn.Module):
 class CVAE_Decoder(nn.Module):
     def __init__(self, image_size, latent_dim):
         super().__init__()
-        self.image_size = image_size # assumed to [w, h], grayscale
+        self.image_size = image_size # [w, h], grayscale
         self.latent_dim = latent_dim
         self.conv_h = image_size[0] // 8
         self.conv_w = (image_size[1] + 7) // 8
 
         self.size1 = conv_dimension(*image_size, padding=1, stride=2, kernel_size=3)
-        self.size2 = conv_dimension(*self.size1, padding=1, stride=2, kernel_size=3)  
+        self.size2 = conv_dimension(*self.size1, padding=1, stride=2, kernel_size=3) 
+        self.size3 = conv_dimension(*self.size2, padding=1, stride=2, kernel_size=3) 
 
-        self.linear = nn.Linear(latent_dim, 128 * self.conv_h * self.conv_w)
+        self.linear = nn.Linear(latent_dim, 128 * self.size3[0] * self.size3[1])
         self.decovn_1 = spectral_norm(nn.ConvTranspose2d(128, 64, 3, stride=2, padding=1, output_padding=1))  # output: (Batch, 64, image_h / 4, image_w / 4)
         self.decovn_2 = spectral_norm(nn.ConvTranspose2d(64, 32, 3, stride=2, padding=1, output_padding=1)) # output: (Batch, 32, image_h /2, image_w / 2)
         self.decovn_3 = spectral_norm(nn.ConvTranspose2d(32, 1, 3, stride=2, padding=1, output_padding=1)) # output: (Batch, 1, image_h, image_w2)
     def forward(self, x):
         batch_size = x.size(0)
         x = self.linear(x)
-        x = x.view(-1, 128, self.conv_h, self.conv_w)
+        x = x.view(-1, 128, self.size3[0], self.size3[1])
         x = F.silu(self.decovn_1(x, output_size=(batch_size, 64, *self.size2)))
         x = F.silu(self.decovn_2(x, output_size=(batch_size, 32, *self.size1)))
         x = self.decovn_3(x, output_size=(x.size(0), 1, *self.image_size))
@@ -180,16 +181,16 @@ class CVAE_Encoder_Deep(nn.Module):
         
         # Calculate dimensions through the network
         # Input: 128×172
-        self.conv1 = spectral_norm(nn.Conv2d(1, 64, 4, stride=2, padding=1))     # 64×86
-        self.conv2 = spectral_norm(nn.Conv2d(64, 128, 4, stride=2, padding=1))   # 32×43
+        self.conv1 = spectral_norm(nn.Conv2d(1, 64, 4, stride=2, padding=1))    # 64×86
+        self.conv2 = spectral_norm(nn.Conv2d(64, 128, 4, stride=2, padding=1))  # 32×43
         self.conv3 = spectral_norm(nn.Conv2d(128, 256, 4, stride=2, padding=1))  # 16×22 (note: 43//2 + 1 = 22)
         self.conv4 = spectral_norm(nn.Conv2d(256, 512, 4, stride=2, padding=1))  # 8×11
         
         # Calculate final feature map size
-        size1 = conv_dimension(*image_size, padding=1, stride=2, kernel_size=4)      # 64×86
-        size2 = conv_dimension(*size1, padding=1, stride=2, kernel_size=4)           # 32×43  
-        size3 = conv_dimension(*size2, padding=1, stride=2, kernel_size=4)           # 16×22
-        size4 = conv_dimension(*size3, padding=1, stride=2, kernel_size=4)           # 8×11
+        size1 = conv_dimension(*image_size, padding=1, stride=2, kernel_size=4) # 64×86
+        size2 = conv_dimension(*size1, padding=1, stride=2, kernel_size=4) # 32×43  
+        size3 = conv_dimension(*size2, padding=1, stride=2, kernel_size=4) # 16×22
+        size4 = conv_dimension(*size3, padding=1, stride=2, kernel_size=4) # 8×11
         
         self.final_size = size4
         

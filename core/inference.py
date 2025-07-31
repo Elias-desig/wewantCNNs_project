@@ -1,6 +1,5 @@
 from .VAE_models import CVAE, VAE
 from .nf_model import MLP_Masked
-#from audio_image_pipeline import
 import sys
 import torch
 
@@ -66,8 +65,9 @@ def generate(model, model_type:str, latent_sample, output_dim:tuple[str], conv:b
             raise NameError('Provide valid model type!')        
     return images
 
+
 def load_nf_model(device):
-    checkpoint_path = "/Users/koraygecimli/PycharmProjects/UDL_demo/wewantCNNs_project/models/nf_checkpoint_20250731-002053.pt"
+    checkpoint_path = "/Users/koraygecimli/PycharmProjects/UDL_demo/wewantCNNs_project/models/nf_checkpoint_20250731-021809.pt"
     checkpoint = torch.load(checkpoint_path, map_location=device)
 
     input_dim = checkpoint['config']['input_dim']
@@ -75,29 +75,13 @@ def load_nf_model(device):
 
     model = MLP_Masked(input_dim=input_dim, hidden_dims=hidden_dims).to(device)
     model.load_state_dict(checkpoint['model_state_dict'])
-
-    return model.eval()
-
-
-def invert_flow(model: MLP_Masked, z: torch.Tensor, device) -> torch.Tensor:
     model.eval()
-    batch_size, dim = z.size()
-    x_recon = torch.zeros_like(z).to(device)
 
+    return model, input_dim
+
+
+def sample_from_flow(model, input_dim, device, batch_size=1):
+    z = torch.randn(batch_size, input_dim, device=device)
     with torch.no_grad():
-        for i in range(dim):
-            # x_partial enthält bisher rekonstruierte Features, der Rest ist 0
-            x_partial = x_recon.clone()
-
-            # Feature i wird jetzt berechnet, also Model auf x_partial forwarden
-            out = x_partial
-            for layer in model.architecture:
-                out = layer(out)
-            output = model.output_layer(out)
-
-            s = torch.clamp(output[:, :dim], min=-5, max=5)
-            t = output[:, dim:]
-
-            x_recon[:, i] = z[:, i] * torch.exp(s[:, i]) + t[:, i]
-
-    return x_recon
+        x_sample = model.inverse(z)
+    return x_sample

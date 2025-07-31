@@ -49,21 +49,19 @@ def reconstruction(model, model_type:str, sample_path:str, conv:bool):
             if not conv:
                 dims = sample.size()
                 sample = sample.view(1, -1)
-            outputs = model(sample, compute_loss=False)
-            # image reconstruction 
-            recon = outputs.x_recon
-            # latent space code 
-            latent_sample = outputs.z_sample
-            if conv:
-                recon = recon.squeeze()
-            if not conv:
-                recon = recon.view(dims)
+            dist = model.encode(sample)
+            z = model.reparameterize(dist)
+            if even:
+                recon = model.decode(z).cpu().view(128, 172)
+            else:
+                recon = model.decode(z).cpu().view(128, 173)
         elif model_type == 'NF':
             pass
         else:
             raise NameError(f'Provide valid model type!{model_type}')
-    recon = melspectrogram_to_audio(recon.cpu())
-    return recon, latent_sample
+    audio = melspectrogram_to_audio(recon)
+
+    return audio, recon, z
 
 def generate(model, model_type:str, latent_sample, output_dim:tuple[str], conv:bool):
     model.eval()

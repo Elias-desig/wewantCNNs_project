@@ -48,11 +48,16 @@ if event and event.selection and event.selection.rows:
     selected_row = results.iloc[selected_idx]
     example_id = selected_row.name
     st.write("Selected Example ID:", example_id)
+    path = str(parent_dir / 'data' / 'audio_samples' / 'nsynth-test' / 'audio' / f"{example_id}.wav")
+    st.audio(path, format='audio/wav')
+    fig, ax = plt.subplots()
+    ax.imshow(audio_to_melspectrogram(path))
+    st.pyplot(fig)    
     audio, reconstructed, latent_z = reconstruction(model, model_options,
-        str(parent_dir / 'data' / 'audio_samples' / 'nsynth-test' / 'audio' / f"{example_id}.wav"),
+    path    ,
         model_options == 'CVAE'
     )
-    #st.audio()
+    st.write('Audio reconstruction')
     st.audio(audio, format="audio/wav", sample_rate=16000)
     fig, ax = plt.subplots()
     ax.imshow(reconstructed)

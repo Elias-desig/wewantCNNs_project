@@ -227,3 +227,4 @@ logs
 
 # Whitelist
 !nsynth-test.jsonwav.tar.gz
+!models/inference/*.pt

@@ -24,9 +24,11 @@ pip install -r Requirements.txt
 
 ## Test the code
 
-We have 2 notebooks to test the code that is working so far. 
-The model_prototyping notebook allows you to train a VAE on some data.
-The data_work notebook showcaes the data and how to work with it.
+Run the streamlit frontend with 
+
+```
+streamlit run streamlit_app/main.py
+```
 
 ## Coming Soon:
 

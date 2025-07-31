@@ -39,6 +39,7 @@ def load_model(checkpoint_path, device, model_type):
 def reconstruction(model, model_type:str, sample_path:str, conv:bool):
     even = model_type == 'CVAE'
     sample = audio_to_melspectrogram(sample_path, even=even)
+    print(sample.shape)
     device = next(model.parameters()).device
     sample = sample.to(device)
     model.eval()
@@ -49,16 +50,19 @@ def reconstruction(model, model_type:str, sample_path:str, conv:bool):
             if not conv:
                 dims = sample.size()
                 sample = sample.view(1, -1)
-            dist = model.encode(sample)
-            z = model.reparameterize(dist)
-            if even:
-                recon = model.decode(z).cpu().view(128, 172)
+            outputs = model(sample, compute_loss=False)
+            recon = outputs.x_recon.cpu()
+            z = outputs.z_sample
+
+            # Reshape the output correctly
+            if conv:
+                recon = recon.squeeze(0).squeeze(0)
             else:
-                recon = model.decode(z).cpu().view(128, 173)
+                recon = recon.view(128, 173)
         elif model_type == 'NF':
             pass
         else:
-            raise NameError(f'Provide valid model type!{model_type}')
+            raise ValueError(f'Provide valid model type!{model_type}')
     audio = melspectrogram_to_audio(recon)
 
     return audio, recon, z

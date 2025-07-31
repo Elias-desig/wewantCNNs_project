@@ -1,8 +1,13 @@
 import torch
 from torch import autocast, amp
-from audio_image_pipeline import audio_to_melspectrogram, melspectrogram_to_audio, save_spectrogram_image
 import math
 from tqdm import tqdm
+
+try:
+    from .audio_image_pipeline import audio_to_melspectrogram, melspectrogram_to_audio, save_spectrogram_image
+except ImportError:
+    from audio_image_pipeline import audio_to_melspectrogram, melspectrogram_to_audio, save_spectrogram_image
+
 
 
 def train(model, dataloader, optimizer, prev_updates, config, device, writer=None, conv=False):
@@ -15,7 +20,7 @@ def train(model, dataloader, optimizer, prev_updates, config, device, writer=Non
         loss_fn: The loss function.
         optimizer: The optimizer.
     """
-    use_amp = True
+    use_amp = False
     model.train()  # Set the model to training mode
     scaler = amp.GradScaler("cuda", enabled=use_amp)
 
@@ -107,6 +112,15 @@ def test(model, dataloader, cur_step, config, device, writer=None, conv=False):
         writer.add_images('Test/Samples', samples.view(-1, 1, H, W), global_step=cur_step)
     return test_loss, test_recon_loss, test_kl_loss
 
-def simple_kl_annealing(epoch):
-    beta = torch.sigmoid(torch.tensor(epoch - 10.0)) * 3
-    return float(beta.clamp(min=1e-2))
+def simple_kl_annealing(epoch, max_epoch=50):
+    if epoch < max_epoch / 10:
+        return 0.01  # Very low beta initially
+    elif epoch < (max_epoch / 10) * 3:
+        # Linear increase
+        return 0.01 + (epoch - 5) * (0.5 - 0.01) / 10
+    elif epoch < (max_epoch / 10) * 6:
+        # Higher beta for stronger disentanglement
+        return 0.5 + (epoch - 15) * (2.0 - 0.5) / 15
+    else:
+        # Very high beta for final epochs
+        return min(5.0, 2.0 + (epoch - 30) * 0.15)

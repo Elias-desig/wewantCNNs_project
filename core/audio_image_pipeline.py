@@ -8,7 +8,10 @@ import os
 import sys
 import h5py
 from tqdm import tqdm
-from .datasets import find_audio_files
+try:
+    from .datasets import find_audio_files
+except ImportError:
+    from datasets import find_audio_files
 # to convert audio to spectrograms and save them as images.
 
 # Audio to Mel-Spectrogram Tensor

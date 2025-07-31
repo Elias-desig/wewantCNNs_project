@@ -6,13 +6,13 @@ import os
 
 @dataclass
 class VAEConf:
-    latent_dim: int= 64
+    latent_dim: int= 256
     n_layers: int= 2
     beta_kl: float= 0.1
-    batch_size: int = 128
-    lr: float = 1e-3
-    weight_decay: float = 1e-2
-    epochs: int = 50   
+    batch_size: int = 32
+    lr: float = 1e-4
+    weight_decay: float = 1e-5
+    epochs: int = 100   
 @dataclass
 class NFConf:
     something: int = 0

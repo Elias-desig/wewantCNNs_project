@@ -1,10 +1,14 @@
-from .functions import layer_dimensions, conv_dimension
+try:
+    from .functions import layer_dimensions, conv_dimension
+except ImportError:
+    from functions import layer_dimensions, conv_dimension
 from dataclasses import dataclass
 import os
 from datetime import datetime
 import torch
 from torch import nn
 import torch.nn.functional as F
+from torch.nn.utils import spectral_norm
 
 
 
@@ -87,12 +91,22 @@ class VAE(nn.Module):
                 loss_recon=None,
                 loss_kl=None,
             )
-        # compute loss terms 
-        loss_recon = F.mse_loss(recon_logits, x, reduction='none')
+        # Use a combination of losses for better reconstruction
+        recon_x = torch.sigmoid(recon_logits)
+        
+        # L1 loss (less blurry than MSE)
+        loss_l1 = F.l1_loss(recon_x, x, reduction='none')
+        
+        # Spectral loss (preserve frequency content)
+        fft_real = torch.fft.rfft2(recon_x)
+        fft_target = torch.fft.rfft2(x)
+        loss_spectral = F.mse_loss(fft_real.real, fft_target.real) + F.mse_loss(fft_real.imag, fft_target.imag)
+        
+        # Combine losses
         if x.ndim == 4:
-            loss_recon = loss_recon.sum(dim=(1,2,3)).mean() # sum over all dims except batch for conv output
+            loss_recon = loss_l1.sum(dim=(1,2,3)).mean() + 0.1 * loss_spectral
         else:
-            loss_recon = loss_recon.sum(-1).mean() # sum over last dimension for flat output
+            loss_recon = loss_l1.sum(-1).mean() + 0.1 * loss_spectral
         std_normal = torch.distributions.Independent(
             torch.distributions.Normal(
                 torch.zeros_like(z), torch.ones_like(z)
@@ -117,9 +131,9 @@ class CVAE_Encoder(nn.Module):
         super().__init__()
         self.image_size = image_size # assumed to [w, h], grayscale
         self.latent_dim = latent_dim
-        self.covn_1 = nn.Conv2d(1, 32, 3, stride=2, padding=1) # output: (Batch, 32, image_h / 2, image_w / 2)
-        self.covn_2 = nn.Conv2d(32, 64, 3, stride=2, padding=1) # output: (Batch, 64, image_h / 4, image_w / 4)
-        self.covn_3 = nn.Conv2d(64, 128, 3, stride=2, padding=1) # output: (Batch, 128, image_h / 8, image_w / 8)
+        self.covn_1 = spectral_norm(nn.Conv2d(1, 32, 3, stride=2, padding=1)) # output: (Batch, 32, image_h / 2, image_w / 2)
+        self.covn_2 = spectral_norm(nn.Conv2d(32, 64, 3, stride=2, padding=1)) # output: (Batch, 64, image_h / 4, image_w / 4)
+        self.covn_3 = spectral_norm(nn.Conv2d(64, 128, 3, stride=2, padding=1)) # output: (Batch, 128, image_h / 8, image_w / 8)
         
         size1 = conv_dimension(*image_size, padding=1, stride=2, kernel_size=3)
         size2 = conv_dimension(*size1, padding=1, stride=2, kernel_size=3)  
@@ -146,9 +160,9 @@ class CVAE_Decoder(nn.Module):
         self.size2 = conv_dimension(*self.size1, padding=1, stride=2, kernel_size=3)  
 
         self.linear = nn.Linear(latent_dim, 128 * self.conv_h * self.conv_w)
-        self.decovn_1 = nn.ConvTranspose2d(128, 64, 3, stride=2, padding=1, output_padding=1)  # output: (Batch, 64, image_h / 4, image_w / 4)
-        self.decovn_2 = nn.ConvTranspose2d(64, 32, 3, stride=2, padding=1, output_padding=1) # output: (Batch, 32, image_h /2, image_w / 2)
-        self.decovn_3 = nn.ConvTranspose2d(32, 1, 3, stride=2, padding=1, output_padding=1) # output: (Batch, 1, image_h, image_w2)
+        self.decovn_1 = spectral_norm(nn.ConvTranspose2d(128, 64, 3, stride=2, padding=1, output_padding=1))  # output: (Batch, 64, image_h / 4, image_w / 4)
+        self.decovn_2 = spectral_norm(nn.ConvTranspose2d(64, 32, 3, stride=2, padding=1, output_padding=1)) # output: (Batch, 32, image_h /2, image_w / 2)
+        self.decovn_3 = spectral_norm(nn.ConvTranspose2d(32, 1, 3, stride=2, padding=1, output_padding=1)) # output: (Batch, 1, image_h, image_w2)
     def forward(self, x):
         batch_size = x.size(0)
         x = self.linear(x)

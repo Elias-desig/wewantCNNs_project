@@ -30,12 +30,7 @@ Run the streamlit frontend with
 streamlit run streamlit_app/main.py
 ```
 
-## Coming Soon:
-
- - Better sample dataset with files already as spectograms in HDF5 format for faster access and therefore training.
- - Working NF model showcase.
- - Module for inference 
-#### Coming later:
+## Coming Soon
 
 - Latent space interface for to work with trained models during inference.
 

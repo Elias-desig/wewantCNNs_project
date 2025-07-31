@@ -1,9 +1,8 @@
-from VAE_models import load_vae_model, CVAE, VAE
-from nf_model import MLP_Masked
+from .VAE_models import CVAE, VAE
+from .nf_model import MLP_Masked
 #from audio_image_pipeline import
 import sys
 import torch
-from nf_model import MLP_Masked
 
 
 

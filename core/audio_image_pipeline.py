@@ -8,16 +8,18 @@ import os
 import sys
 import h5py
 from tqdm import tqdm
-from datasets import find_audio_files
+from .datasets import find_audio_files
 # to convert audio to spectrograms and save them as images.
 
 # Audio to Mel-Spectrogram Tensor
-def audio_to_melspectrogram(audio_path, sr=22050, n_mels=128, hop_length=512):
+def audio_to_melspectrogram(audio_path, sr=22050, n_mels=128, hop_length=512, even=False):
     if not os.path.isfile(audio_path):
         raise OSError('Audio path does not exist')
     y, sr = librosa.load(audio_path, sr=sr)
     S = librosa.feature.melspectrogram(y=y, sr=sr, n_mels=n_mels, hop_length=hop_length)
     S_dB = librosa.power_to_db(S, ref=np.max)
+    if even:
+        S_dB = S_dB[:,:-1]
     return torch.tensor(S_dB, dtype=torch.float32)
 
 # Mel-Spectrogram Tensor to Audio

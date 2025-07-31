@@ -1,4 +1,4 @@
-from functions import layer_dimensions, conv_dimension
+from .functions import layer_dimensions, conv_dimension
 from dataclasses import dataclass
 import os
 from datetime import datetime

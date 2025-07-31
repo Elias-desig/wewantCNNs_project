@@ -224,3 +224,6 @@ data/nsynth-valid
 data/nsynth-test
 data/sample_subset
 logs
+
+# Whitelist
+!nsynth-test.jsonwav.tar.gz

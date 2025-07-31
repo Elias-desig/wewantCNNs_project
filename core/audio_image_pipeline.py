@@ -14,7 +14,7 @@ from .datasets import find_audio_files
 # Audio to Mel-Spectrogram Tensor
 def audio_to_melspectrogram(audio_path, sr=22050, n_mels=128, hop_length=512, even=False):
     if not os.path.isfile(audio_path):
-        raise OSError('Audio path does not exist')
+        raise OSError(f'Audio path does not exist{audio_path}')
     y, sr = librosa.load(audio_path, sr=sr)
     S = librosa.feature.melspectrogram(y=y, sr=sr, n_mels=n_mels, hop_length=hop_length)
     S_dB = librosa.power_to_db(S, ref=np.max)

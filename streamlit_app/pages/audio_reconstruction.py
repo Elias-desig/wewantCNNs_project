@@ -3,10 +3,12 @@ from pathlib import Path
 import json
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
 import streamlit as st
-from core import load_model, reconstruction
+from core import select_model, reconstruction, audio_to_melspectrogram
 parent_dir = Path(__file__).parent.parent.parent
+sys.path.append(str(parent_dir))
 metadata_file = parent_dir /'data' / 'audio_samples' / 'nsynth-test/examples.json'
 
 with open(metadata_file, 'r') as f:
@@ -14,7 +16,7 @@ with open(metadata_file, 'r') as f:
 
 df = pd.DataFrame(data).T
 df.columns = df.columns.astype(str)
-model_options = st.selectbox("Select a Model", ["VAE", "Convolutional VAE", "Autoregressive NF"])
+model_options = st.selectbox("Select a Model", ["VAE", "CVAE", "NF"])
 quality_options = ['bright', 'dark', 'distortion', 'fast_decay', 'long_release', 'multiphonic', 'nonlinear_env', 'percussive', 'reverb', 'tempo-synced']
 st.header('Select a sample as a starting point:')
 instrument_source = st.selectbox('Instrument Source', ['acoustic', 'electronic', 'synthetic'])
@@ -22,7 +24,7 @@ instrument_family = st.selectbox('Instrument Familty', ['bass', 'brass', 'flute'
 note_qualities = st.multiselect('Note Qualities', quality_options)
 
 st.write('Model:',model_options)
-model = load_model(model_options)
+model = select_model(model_options)
 results = df[
     (df['instrument_source_str'] == instrument_source) &
     (df['instrument_family_str'] == instrument_family)
@@ -32,23 +34,27 @@ if note_qualities:
     results = results[
         results['qualities']
                .apply(lambda bv: all(bv[i] == 1 for i in selected_idxs))
-    ] 
-
-def on_row_select(selected_idx):
-    if selected_idx is None:
-        return
-    # get the DataFrame row and its index (the example ID)
-    selected_row = results.iloc[selected_idx]
-    example_id = selected_row.name
-
-    st.write("Selected Example ID:", example_id)
-    # reconstruct and play back
-    reconstructed = reconstruction(
-        model,
-        str(parent_dir / 'data' / 'audio_samples' / f"{example_id}.wav")
-    )
-    st.audio(reconstructed, format='audio/wav')    
+    ]  
 
 st.write("Results")
-st.dataframe(results, selection_mode='single-row', on_select=)
-
+event = st.dataframe(
+    results,
+    selection_mode="single-row",
+    on_select="rerun",
+    key="recon_df"
+)
+if event and event.selection and event.selection.rows:
+    selected_idx = event.selection.rows[0]
+    selected_row = results.iloc[selected_idx]
+    example_id = selected_row.name
+    st.write("Selected Example ID:", example_id)
+    test = audio_to_melspectrogram(str(parent_dir / 'data' / 'audio_samples' / 'nsynth-test' / 'audio' / f"{example_id}.wav"), even=True)
+    st.write(test.size())
+    reconstructed, latent_z = reconstruction(model, model_options,
+        str(parent_dir / 'data' / 'audio_samples' / 'nsynth-test' / 'audio' / f"{example_id}.wav"),
+        model_options == 'CVAE'
+    )
+    #st.audio()
+    st.audio(reconstructed, format="audio/wav", sample_rate=16000)
+    st.write(reconstructed.shape)
+    st.write(plt.imshow(reconstructed))

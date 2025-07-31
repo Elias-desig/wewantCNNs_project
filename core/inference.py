@@ -1,15 +1,17 @@
 from .VAE_models import CVAE, VAE
 from .nf_model import MLP_Masked
-#from audio_image_pipeline import
+from .audio_image_pipeline import audio_to_melspectrogram, melspectrogram_to_audio
 import sys
+from pathlib import Path
 import torch
+
 
 
 
 def load_model(checkpoint_path, device, model_type):
     """Load VAE model from checkpoint"""
     checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
-    
+    model = None
     if model_type == 'CVAE':
         model = CVAE(
             checkpoint['config']['image_size'],
@@ -27,30 +29,40 @@ def load_model(checkpoint_path, device, model_type):
             checkpoint['config']['hidden_dim'],
             checkpoint['config']['conv']
         ).to(device)
+    else:
+        raise ValueError(f'Not a valid model type:{model_type!r}')
     # Load weights
     model.load_state_dict(checkpoint['model_state_dict'])
     
     return model, checkpoint
 
-def reconstruction(model, model_type:str, samples, conv:bool):
-
+def reconstruction(model, model_type:str, sample_path:str, conv:bool):
+    even = model_type == 'CVAE'
+    sample = audio_to_melspectrogram(sample_path, even=even)
+    device = next(model.parameters()).device
+    sample = sample.to(device)
     model.eval()
     with torch.no_grad():
-        if model_type == 'VAE':
-            if not conv and len(samples.size) > 1:
-                dims = samples.size()
-                samples = samples.view(dims[0], -1)
-            outputs = model(samples, compute_loss=False)
+        if model_type == 'VAE' or model_type == 'CVAE':
+            if conv:
+                sample = sample.unsqueeze(0).unsqueeze(0)
+            if not conv:
+                dims = sample.size()
+                sample = sample.view(1, -1)
+            outputs = model(sample, compute_loss=False)
             # image reconstruction 
             recon = outputs.x_recon
             # latent space code 
             latent_sample = outputs.z_sample
-            if not conv and len(samples.size) > 1:
+            if conv:
+                recon = recon.squeeze()
+            if not conv:
                 recon = recon.view(dims)
-        if model_type == 'NF':
+        elif model_type == 'NF':
             pass
         else:
-            raise NameError('Provide valid model type!')
+            raise NameError(f'Provide valid model type!{model_type}')
+    recon = melspectrogram_to_audio(recon.cpu())
     return recon, latent_sample
 
 def generate(model, model_type:str, latent_sample, output_dim:tuple[str], conv:bool):
@@ -101,3 +113,29 @@ def invert_flow(model: MLP_Masked, z: torch.Tensor, device) -> torch.Tensor:
             x_recon[:, i] = z[:, i] * torch.exp(s[:, i]) + t[:, i]
 
     return x_recon
+
+
+
+def select_model(model_type, device=None):
+    base_dir = Path(__file__).parent.parent
+    checkpoint_dir = base_dir / 'models' / 'inference'
+    if device is None:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    patterns = {
+        'VAE':  '*vae_checkpoint_*.pt',
+        'CVAE': '*c_vae_checkpoint_*.pt',
+        'NF':   '*nf_checkpoint_*.pt'
+    }
+    try:
+        pat = patterns[model_type]
+    except KeyError:
+        raise ValueError(f"Unknown model_type {model_type!r}")
+
+    matches = sorted(checkpoint_dir.glob(pat), key=lambda p: p.stat().st_mtime, reverse=True)
+    if not matches:
+        raise FileNotFoundError(f"No checkpoint file matching `{pat}` in {checkpoint_dir}")
+
+    checkpoint_path = matches[0]
+    model, checkpoint = load_model(str(checkpoint_path), device, model_type)
+    return model

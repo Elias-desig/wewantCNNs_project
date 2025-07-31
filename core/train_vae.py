@@ -1,6 +1,6 @@
 import torch
 from torch import autocast, amp
-from audio_image_pipeline import audio_to_melspectrogram, melspectrogram_to_audio, save_spectrogram_image
+from .audio_image_pipeline import (audio_to_melspectrogram, melspectrogram_to_audio, save_spectrogram_image)
 import math
 from tqdm import tqdm
 

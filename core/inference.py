@@ -39,7 +39,6 @@ def load_model(checkpoint_path, device, model_type):
 def reconstruction(model, model_type:str, sample_path:str, conv:bool):
     even = model_type == 'CVAE'
     sample = audio_to_melspectrogram(sample_path, even=even)
-    print(sample.shape)
     device = next(model.parameters()).device
     sample = sample.to(device)
     model.eval()

@@ -120,10 +120,10 @@ def select_model(model_type, device=None):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     patterns = {
-        'VAE':  '*vae_checkpoint_*.pt',
-        'CVAE': '*c_vae_checkpoint_*.pt',
-        'NF':   '*nf_checkpoint_*.pt',
-        'CVAE_Deep': '*deep_c_vae_checkpoint_*.pt'
+        'VAE':  'vae_checkpoint_*.pt',
+        'CVAE': 'c_vae_checkpoint_*.pt',
+        'NF':   'nf_checkpoint_*.pt',
+        'CVAE_Deep': 'deep_c_vae_checkpoint_*.pt'
     }
     try:
         pat = patterns[model_type]
@@ -135,5 +135,6 @@ def select_model(model_type, device=None):
         raise FileNotFoundError(f"No checkpoint file matching `{pat}` in {checkpoint_dir}")
 
     checkpoint_path = matches[0]
+    print(f'loading model from path: {str(checkpoint_path)}, model type: {model_type}')
     model, checkpoint = load_model(str(checkpoint_path), device, model_type)
     return model
